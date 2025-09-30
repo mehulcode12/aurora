@@ -4,4 +4,5 @@ webrtcvad
 faster-whisper 
 TTS 
 cerebras_cloud_sdk 
-torch
+huggingface_hub[hf_xet]
+python-dotenv

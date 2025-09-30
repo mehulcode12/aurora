@@ -3,11 +3,12 @@ Real-Time Audio AI Agent - Full Duplex Pattern
 Using Cerebras for Ultra-Fast LLM Inference
 
 Requirements:
-pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch
+pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch python-dotenv
 
 Before running:
 1. Get free Cerebras API key: https://cloud.cerebras.ai/
-2. Set environment variable: export CEREBRAS_API_KEY=your_key_here
+2. Create .env file with: CEREBRAS_API_KEY=your_key_here
+   OR set environment variable: export CEREBRAS_API_KEY=your_key_here
 """
 
 import sounddevice as sd
@@ -25,6 +26,13 @@ from cerebras.cloud.sdk import Cerebras
 import os
 from pathlib import Path
 import threading
+import time
+import requests
+from urllib3.exceptions import IncompleteRead
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ============================================================================
 # CONFIGURATION
@@ -42,9 +50,16 @@ class Config:
     
     # Model settings
     WHISPER_MODEL = "base"  # tiny, base, small, medium, large
+    WHISPER_FALLBACK_MODEL = "tiny"  # Fallback if base fails to download
     CEREBRAS_MODEL = "llama3.1-8b"  # Ultra-fast inference on Cerebras
     TTS_MODEL = "tts_models/en/ljspeech/tacotron2-DDC"  # Fast, good quality
-
+    TTS_FALLBACK_MODEL = "tts_models/en/ljspeech/glow-tts"  # Alternative TTS model
+    
+    # Download settings
+    MAX_DOWNLOAD_RETRIES = 3
+    DOWNLOAD_TIMEOUT = 300  # 5 minutes
+    
+    print("configured")
 # ============================================================================
 # AUDIO COMPONENTS
 # ============================================================================
@@ -115,8 +130,11 @@ class AudioPlayer:
                 
                 # Read and play audio file
                 data, fs = self._read_audio_file(audio_file)
-                sd.play(data, fs)
-                sd.wait()
+                if data is not None and fs is not None:
+                    sd.play(data, fs)
+                    sd.wait()
+                else:
+                    print(f"  ⚠️ Skipping playback due to audio read error")
                 
                 # Cleanup temp file
                 try:
@@ -128,12 +146,37 @@ class AudioPlayer:
                 continue
     
     def _read_audio_file(self, filename):
-        """Read audio file"""
-        with wave.open(filename, 'rb') as wf:
-            sample_rate = wf.getframerate()
-            frames = wf.readframes(wf.getnframes())
-            audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
-            return audio, sample_rate
+        """Read audio file with error handling"""
+        try:
+            if not os.path.exists(filename):
+                print(f"  ⚠️ Audio file not found: {filename}")
+                return None, None
+            
+            file_size = os.path.getsize(filename)
+            if file_size < 1000:  # Less than 1KB is suspicious
+                print(f"  ⚠️ Audio file too small: {file_size} bytes")
+                return None, None
+            
+            with wave.open(filename, 'rb') as wf:
+                sample_rate = wf.getframerate()
+                frames = wf.readframes(wf.getnframes())
+                
+                if not frames:
+                    print(f"  ⚠️ Empty audio file: {filename}")
+                    return None, None
+                
+                audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+                
+                # Check if audio is all zeros (silence/gibberish)
+                if np.max(np.abs(audio)) < 0.001:
+                    print(f"  ⚠️ Audio appears to be silence: {filename}")
+                    return None, None
+                
+                return audio, sample_rate
+                
+        except Exception as e:
+            print(f"  ✗ Error reading audio file {filename}: {e}")
+            return None, None
     
     def start(self):
         """Start playback thread"""
@@ -145,6 +188,66 @@ class AudioPlayer:
         self.playback_queue.put(None)
 
 # ============================================================================
+# MODEL DOWNLOADER
+# ============================================================================
+class ModelDownloader:
+    """Handles robust model downloading with retry logic"""
+    
+    @staticmethod
+    def download_whisper_model(model_name: str, max_retries: int = None) -> bool:
+        """Download Whisper model with retry logic"""
+        if max_retries is None:
+            max_retries = 3  # Default retries
+            
+        print(f"Attempting to download Whisper model '{model_name}'...")
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"  Attempt {attempt + 1}/{max_retries}...")
+                
+                # Set environment variables for better download handling
+                os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+                
+                # Try to download the model
+                model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                print(f"✓ Successfully downloaded model '{model_name}'")
+                return True
+                
+            except (IncompleteRead, requests.exceptions.ChunkedEncodingError, 
+                   requests.exceptions.ConnectionError, Exception) as e:
+                print(f"  ✗ Download attempt {attempt + 1} failed: {str(e)[:100]}...")
+                
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    print(f"  Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"  ✗ All download attempts failed for model '{model_name}'")
+                    return False
+        
+        return False
+    
+    @staticmethod
+    def check_model_cached(model_name: str) -> bool:
+        """Check if model is already cached locally"""
+        try:
+            from huggingface_hub import snapshot_download
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            model_cache_path = os.path.join(cache_dir, f"models--Systran--faster-whisper-{model_name}")
+            
+            if os.path.exists(model_cache_path):
+                # Check if all required files are present
+                required_files = ["config.json", "tokenizer.json", "model.bin"]
+                for file in required_files:
+                    if not os.path.exists(os.path.join(model_cache_path, file)):
+                        return False
+                print(f"✓ Found cached model '{model_name}'")
+                return True
+        except Exception:
+            pass
+        return False
+
+# ============================================================================
 # AI COMPONENTS
 # ============================================================================
 class SpeechToText:
@@ -152,8 +255,47 @@ class SpeechToText:
     
     def __init__(self, config: Config):
         print(f"Loading Whisper model '{config.WHISPER_MODEL}'...")
-        self.model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
-        print("✓ Whisper loaded")
+        
+        # First check if model is already cached
+        if ModelDownloader.check_model_cached(config.WHISPER_MODEL):
+            try:
+                self.model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
+                print("✓ Whisper loaded from cache")
+                return
+            except Exception as e:
+                print(f"  ✗ Failed to load from cache: {e}")
+                print("  Attempting fresh download...")
+        
+        # Try to download with retry logic
+        if ModelDownloader.download_whisper_model(config.WHISPER_MODEL, config.MAX_DOWNLOAD_RETRIES):
+            try:
+                self.model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
+                print("✓ Whisper loaded successfully")
+            except Exception as e:
+                print(f"✗ Failed to initialize Whisper model: {e}")
+                raise
+        else:
+            # Try fallback model
+            print(f"\nTrying fallback model '{config.WHISPER_FALLBACK_MODEL}'...")
+            if ModelDownloader.download_whisper_model(config.WHISPER_FALLBACK_MODEL, config.MAX_DOWNLOAD_RETRIES):
+                try:
+                    self.model = WhisperModel(config.WHISPER_FALLBACK_MODEL, device="cpu", compute_type="int8")
+                    print(f"✓ Whisper fallback model '{config.WHISPER_FALLBACK_MODEL}' loaded successfully")
+                except Exception as e:
+                    print(f"✗ Failed to initialize fallback model: {e}")
+                    raise
+            else:
+                print("\n" + "="*70)
+                print("DOWNLOAD FAILED - OFFLINE MODE OPTIONS:")
+                print("="*70)
+                print("1. Check your internet connection and try again")
+                print("2. Try using a different network (mobile hotspot, etc.)")
+                print("3. Download manually from: https://huggingface.co/Systran/faster-whisper-base")
+                print("4. Use a smaller model by changing WHISPER_MODEL to 'tiny' in config")
+                print("5. Wait and try again later (servers may be busy)")
+                print("6. Try running: pip install --upgrade huggingface_hub")
+                print("="*70)
+                raise RuntimeError("Failed to download any Whisper model after multiple attempts")
     
     def transcribe(self, audio_data: np.ndarray, sample_rate: int) -> str:
         """Transcribe audio to text"""
@@ -181,10 +323,13 @@ class LanguageModel:
         
         # Get API key from environment
         api_key = os.getenv("CEREBRAS_API_KEY")
-        if not api_key:
+        if api_key:
+            print(f"api_key: {api_key[:5]}...")
+        else:
             print(" CEREBRAS_API_KEY not found!")
             print("Get your free API key at: https://cloud.cerebras.ai/")
-            print("Then set it: export CEREBRAS_API_KEY=your_key_here")
+            print("Then set it in .env file: CEREBRAS_API_KEY=your_key_here")
+            print("Or export it: export CEREBRAS_API_KEY=your_key_here")
             raise ValueError("Missing CEREBRAS_API_KEY")
         
         # Initialize Cerebras client
@@ -271,20 +416,82 @@ class TextToSpeech:
     """Converts text to speech using Coqui TTS"""
     
     def __init__(self, config: Config):
-        print(f"Loading TTS model '{config.TTS_MODEL}'...")
-        self.tts = TTS(config.TTS_MODEL)
-        print("✓ TTS loaded")
+        self.config = config
         self.temp_dir = tempfile.gettempdir()
+        
+        print(f"Loading TTS model '{config.TTS_MODEL}'...")
+        try:
+            self.tts = TTS(config.TTS_MODEL)
+            print("✓ TTS loaded")
+        except Exception as e:
+            print(f"✗ Primary TTS model failed: {e}")
+            print(f"Trying fallback TTS model '{config.TTS_FALLBACK_MODEL}'...")
+            try:
+                self.tts = TTS(config.TTS_FALLBACK_MODEL)
+                print("✓ Fallback TTS loaded")
+            except Exception as e2:
+                print(f"✗ Fallback TTS also failed: {e2}")
+                raise RuntimeError("Both TTS models failed to load")
+    
+    def sanitize_text(self, text: str) -> str:
+        """Clean text to prevent TTS gibberish"""
+        if not text or not text.strip():
+            return "I didn't understand that."
+        
+        # Remove problematic characters that can cause TTS issues
+        import re
+        
+        # Remove excessive punctuation
+        text = re.sub(r'[!]{2,}', '!', text)  # Multiple exclamations
+        text = re.sub(r'[?]{2,}', '?', text)  # Multiple questions
+        text = re.sub(r'[.]{2,}', '.', text)  # Multiple periods
+        
+        # Remove special characters that TTS might not handle well
+        text = re.sub(r'[^\w\s.,!?\-:;()\']', '', text)
+        
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Limit length to prevent very long audio
+        if len(text) > 500:
+            text = text[:500] + "..."
+        
+        # Ensure it ends with proper punctuation
+        if text and not text[-1] in '.!?':
+            text += '.'
+        
+        return text
     
     def synthesize(self, text: str) -> str:
         """Convert text to speech and return audio file path"""
-        # Create temp file
-        output_file = os.path.join(self.temp_dir, f"tts_{id(text)}.wav")
-        
-        # Generate speech
-        self.tts.tts_to_file(text=text, file_path=output_file)
-        
-        return output_file
+        try:
+            # Sanitize text first
+            clean_text = self.sanitize_text(text)
+            
+            if not clean_text or clean_text.strip() == ".":
+                print("  ⚠️ Empty or invalid text, skipping TTS")
+                return None
+            
+            print(f"  📝 TTS Input: {clean_text[:100]}{'...' if len(clean_text) > 100 else ''}")
+            
+            # Create temp file with timestamp to avoid conflicts
+            import time
+            output_file = os.path.join(self.temp_dir, f"tts_{int(time.time() * 1000)}.wav")
+            
+            # Generate speech with error handling
+            self.tts.tts_to_file(text=clean_text, file_path=output_file)
+            
+            # Validate the generated audio file
+            if not os.path.exists(output_file) or os.path.getsize(output_file) < 1000:  # Less than 1KB is suspicious
+                print("  ⚠️ Generated audio file is too small or missing")
+                return None
+            
+            print(f"  ✓ TTS generated: {os.path.getsize(output_file)} bytes")
+            return output_file
+            
+        except Exception as e:
+            print(f"  ✗ TTS synthesis failed: {e}")
+            return None
 
 # ============================================================================
 # MAIN AGENT
@@ -340,9 +547,12 @@ class RealTimeAgent:
         print("  → Synthesizing speech...")
         audio_file = self.tts.synthesize(response)
         
-        # 4. Play audio
-        print("  → Playing response...")
-        self.audio_player.play(audio_file)
+        # 4. Play audio (only if TTS succeeded)
+        if audio_file:
+            print("  → Playing response...")
+            self.audio_player.play(audio_file)
+        else:
+            print("  ⚠️ TTS failed, skipping audio playback")
     
     async def audio_processing_loop(self):
         """Main async loop for processing audio"""
@@ -430,8 +640,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n Error: {e}")
         print("\nMake sure you have:")
-        print("1. Installed all dependencies: pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch")
-        print("2. Set your Cerebras API key: export CEREBRAS_API_KEY=your_key_here")
+        print("1. Installed all dependencies: pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch python-dotenv")
+        print("2. Created .env file with: CEREBRAS_API_KEY=your_key_here")
+        print("   OR set environment variable: export CEREBRAS_API_KEY=your_key_here")
         print("3. Get free API key at: https://cloud.cerebras.ai/")
 
 
