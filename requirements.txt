@@ -1,0 +1,7 @@
+sounddevice 
+numpy 
+webrtcvad 
+faster-whisper 
+TTS 
+cerebras_cloud_sdk 
+torch
