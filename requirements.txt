@@ -6,3 +6,5 @@ TTS
 cerebras_cloud_sdk 
 huggingface_hub[hf_xet]
 python-dotenv
+twilio 
+flask
