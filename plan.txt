@@ -1,0 +1,21 @@
+Tiny real-time example — gas leak at a factory
+
+1. Worker calls: “Strong smell of gas in Zone B near Valve 3.”
+2. Aurora (instant): identifies “possible gas leak” → finds SOP for gas leaks → sends this short, actionable reply to the worker:
+   “Evacuate Zone B immediately. Shut Valve 3 if safe. Switch off nearby ignition sources. Call on-site gas-repair team + fire brigade. Move to Assembly Point Alpha.”
+3. Aurora also: notifies emergency responders and on-site supervisor, flags the conversation as CRITICAL, and stores the full log.
+4. Supervisor sees the live thread on the admin panel and can immediately take over the call if needed.
+
+Why this helps: worker gets clear, safe actions right away; emergency teams are alerted without delay; supervisors can intervene while everything is logged for review.
+
+Aurora — simple summary
+
+Elevator pitch: Aurora is a fast AI field assistant that helps frontline workers get immediate, practical guidance by voice or Telegram. If a human operator isn’t available, Aurora reads the situation, finds the right SOP or first-action, replies to the worker, and alerts emergency teams if needed — all in seconds.
+
+How it works (very simple):
+1. A worker speaks or sends a Telegram message describing a problem.
+2. Aurora understands the issue, looks up the correct manual/SOP, and sends a clear next-step reply to the worker.
+3. If the situation is critical (police/ambulance/fire), Aurora alerts the proper responders automatically.
+4. Field supervisors see all live and past chats in a dashboard, with conversations labeled normal → critical. A supervisor can jump in and take over any call.
+5. Every interaction is logged for review and compliance.
+
