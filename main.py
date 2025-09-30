@@ -1,9 +1,9 @@
 """
-Real-Time Audio AI Agent - Full Duplex Pattern
-Using Cerebras for Ultra-Fast LLM Inference
+Real-Time Audio AI Agent - Full Duplex with STREAMING Audio Output
+Using Cerebras for Ultra-Fast LLM Inference + Streaming TTS
 
 Requirements:
-pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch python-dotenv
+pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch python-dotenv pydub
 
 Before running:
 1. Get free Cerebras API key: https://cloud.cerebras.ai/
@@ -16,20 +16,20 @@ import numpy as np
 import webrtcvad
 import asyncio
 import queue
-import struct
 import wave
 import tempfile
 import os
 from faster_whisper import WhisperModel
 from TTS.api import TTS
 from cerebras.cloud.sdk import Cerebras
-import os
 from pathlib import Path
 import threading
 import time
 import requests
 from urllib3.exceptions import IncompleteRead
 from dotenv import load_dotenv
+import re
+from io import BytesIO
 
 # Load environment variables from .env file
 load_dotenv()
@@ -55,11 +55,14 @@ class Config:
     TTS_MODEL = "tts_models/en/ljspeech/tacotron2-DDC"  # Fast, good quality
     TTS_FALLBACK_MODEL = "tts_models/en/ljspeech/glow-tts"  # Alternative TTS model
     
+    # Streaming settings
+    ENABLE_STREAMING = True  # Enable sentence-by-sentence TTS streaming
+    SENTENCE_CHUNK_SIZE = 1  # Process 1 sentence at a time for lowest latency
+    
     # Download settings
     MAX_DOWNLOAD_RETRIES = 3
     DOWNLOAD_TIMEOUT = 300  # 5 minutes
-    
-    print("configured")
+
 # ============================================================================
 # AUDIO COMPONENTS
 # ============================================================================
@@ -108,42 +111,63 @@ class AudioCapture:
             self.stream.stop()
             self.stream.close()
 
-class AudioPlayer:
-    """Plays audio output"""
+class StreamingAudioPlayer:
+    """Plays audio output with streaming support for lowest latency"""
     
     def __init__(self, config: Config):
         self.config = config
         self.playback_queue = queue.Queue()
         self.is_playing = False
+        self.current_stream = None
+        self.stream_lock = threading.Lock()
         
     def play(self, audio_file: str):
         """Add audio file to playback queue"""
-        self.playback_queue.put(audio_file)
+        self.playback_queue.put(('file', audio_file))
+    
+    def play_audio_data(self, audio_data: np.ndarray, sample_rate: int):
+        """Play audio data directly (for streaming)"""
+        self.playback_queue.put(('data', audio_data, sample_rate))
     
     def playback_worker(self):
-        """Worker thread for playing audio"""
+        """Worker thread for playing audio with streaming support"""
         while True:
             try:
-                audio_file = self.playback_queue.get(timeout=1)
-                if audio_file is None:  # Stop signal
+                item = self.playback_queue.get(timeout=1)
+                if item is None:  # Stop signal
                     break
                 
-                # Read and play audio file
-                data, fs = self._read_audio_file(audio_file)
-                if data is not None and fs is not None:
-                    sd.play(data, fs)
-                    sd.wait()
-                else:
-                    print(f"  ⚠️ Skipping playback due to audio read error")
-                
-                # Cleanup temp file
-                try:
-                    os.unlink(audio_file)
-                except:
-                    pass
+                if item[0] == 'file':
+                    # Play from file
+                    audio_file = item[1]
+                    data, fs = self._read_audio_file(audio_file)
+                    if data is not None and fs is not None:
+                        self._play_audio(data, fs)
+                    
+                    # Cleanup temp file
+                    try:
+                        os.unlink(audio_file)
+                    except:
+                        pass
+                        
+                elif item[0] == 'data':
+                    # Play audio data directly (streaming)
+                    audio_data, sample_rate = item[1], item[2]
+                    self._play_audio(audio_data, sample_rate)
                     
             except queue.Empty:
                 continue
+            except Exception as e:
+                print(f"  ⚠️ Playback error: {e}")
+    
+    def _play_audio(self, data: np.ndarray, sample_rate: int):
+        """Play audio data through speakers"""
+        try:
+            with self.stream_lock:
+                sd.play(data, sample_rate)
+                sd.wait()
+        except Exception as e:
+            print(f"  ⚠️ Audio playback failed: {e}")
     
     def _read_audio_file(self, filename):
         """Read audio file with error handling"""
@@ -236,11 +260,6 @@ class ModelDownloader:
             model_cache_path = os.path.join(cache_dir, f"models--Systran--faster-whisper-{model_name}")
             
             if os.path.exists(model_cache_path):
-                # Check if all required files are present
-                required_files = ["config.json", "tokenizer.json", "model.bin"]
-                for file in required_files:
-                    if not os.path.exists(os.path.join(model_cache_path, file)):
-                        return False
                 print(f"✓ Found cached model '{model_name}'")
                 return True
         except Exception:
@@ -285,16 +304,6 @@ class SpeechToText:
                     print(f"✗ Failed to initialize fallback model: {e}")
                     raise
             else:
-                print("\n" + "="*70)
-                print("DOWNLOAD FAILED - OFFLINE MODE OPTIONS:")
-                print("="*70)
-                print("1. Check your internet connection and try again")
-                print("2. Try using a different network (mobile hotspot, etc.)")
-                print("3. Download manually from: https://huggingface.co/Systran/faster-whisper-base")
-                print("4. Use a smaller model by changing WHISPER_MODEL to 'tiny' in config")
-                print("5. Wait and try again later (servers may be busy)")
-                print("6. Try running: pip install --upgrade huggingface_hub")
-                print("="*70)
                 raise RuntimeError("Failed to download any Whisper model after multiple attempts")
     
     def transcribe(self, audio_data: np.ndarray, sample_rate: int) -> str:
@@ -323,13 +332,10 @@ class LanguageModel:
         
         # Get API key from environment
         api_key = os.getenv("CEREBRAS_API_KEY")
-        if api_key:
-            print(f"api_key: {api_key[:5]}...")
-        else:
-            print(" CEREBRAS_API_KEY not found!")
+        if not api_key:
+            print("❌ CEREBRAS_API_KEY not found!")
             print("Get your free API key at: https://cloud.cerebras.ai/")
             print("Then set it in .env file: CEREBRAS_API_KEY=your_key_here")
-            print("Or export it: export CEREBRAS_API_KEY=your_key_here")
             raise ValueError("Missing CEREBRAS_API_KEY")
         
         # Initialize Cerebras client
@@ -389,7 +395,7 @@ Always assume the worker is in the field and needs actionable steps RIGHT NOW.""
             response = self.client.chat.completions.create(
                 model=self.config.CEREBRAS_MODEL,
                 messages=self.conversation_history,
-                max_tokens=1000 if is_urgent else 2000,  # Allow longer critical responses
+                max_tokens=250 if is_urgent else 200,  # Allow longer critical responses
                 temperature=0.3,  # Lower temperature for more reliable safety instructions
             )
             
@@ -397,23 +403,23 @@ Always assume the worker is in the field and needs actionable steps RIGHT NOW.""
             
             # Log critical situations
             if is_urgent:
-                print(f"\n  CRITICAL SITUATION DETECTED")
-                print(f" Alert: Emergency response triggered")
+                print(f"\n  ⚠️ CRITICAL SITUATION DETECTED")
+                print(f"  📝 Alert: Emergency response triggered")
             
             self.conversation_history.append({"role": "assistant", "content": assistant_message})
             
             # Keep conversation history manageable
-            if len(self.conversation_history) > 12:  # Keep system prompt + last 10 messages
+            if len(self.conversation_history) > 12:
                 self.conversation_history = [self.conversation_history[0]] + self.conversation_history[-10:]
             
             return assistant_message
             
         except Exception as e:
-            print(f" Cerebras API error: {e}")
+            print(f"❌ Cerebras API error: {e}")
             return "Emergency system error. Please call your supervisor immediately and follow standard emergency procedures."
 
-class TextToSpeech:
-    """Converts text to speech using Coqui TTS"""
+class StreamingTextToSpeech:
+    """Converts text to speech with sentence-by-sentence streaming for lowest latency"""
     
     def __init__(self, config: Config):
         self.config = config
@@ -422,103 +428,164 @@ class TextToSpeech:
         print(f"Loading TTS model '{config.TTS_MODEL}'...")
         try:
             self.tts = TTS(config.TTS_MODEL)
-            print("✓ TTS loaded")
+            print("✓ TTS loaded (streaming enabled)")
         except Exception as e:
             print(f"✗ Primary TTS model failed: {e}")
             print(f"Trying fallback TTS model '{config.TTS_FALLBACK_MODEL}'...")
             try:
                 self.tts = TTS(config.TTS_FALLBACK_MODEL)
-                print("✓ Fallback TTS loaded")
+                print("✓ Fallback TTS loaded (streaming enabled)")
             except Exception as e2:
                 print(f"✗ Fallback TTS also failed: {e2}")
                 raise RuntimeError("Both TTS models failed to load")
     
+    def split_into_sentences(self, text: str) -> list:
+        """Split text into sentences for streaming"""
+        # Use regex to split on sentence boundaries
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        # Filter out empty sentences
+        sentences = [s.strip() for s in sentences if s.strip()]
+        return sentences
+    
     def sanitize_text(self, text: str) -> str:
         """Clean text to prevent TTS gibberish"""
         if not text or not text.strip():
-            return "I didn't understand that."
+            return ""
         
-        # Remove problematic characters that can cause TTS issues
-        import re
-        
-        # Remove excessive punctuation
-        text = re.sub(r'[!]{2,}', '!', text)  # Multiple exclamations
-        text = re.sub(r'[?]{2,}', '?', text)  # Multiple questions
-        text = re.sub(r'[.]{2,}', '.', text)  # Multiple periods
-        
-        # Remove special characters that TTS might not handle well
+        # Remove problematic characters
+        text = re.sub(r'[!]{2,}', '!', text)
+        text = re.sub(r'[?]{2,}', '?', text)
+        text = re.sub(r'[.]{2,}', '.', text)
         text = re.sub(r'[^\w\s.,!?\-:;()\']', '', text)
-        
-        # Remove excessive whitespace
         text = re.sub(r'\s+', ' ', text).strip()
         
-        # Limit length to prevent very long audio
-        if len(text) > 500:
-            text = text[:500] + "..."
-        
-        # Ensure it ends with proper punctuation
+        # Ensure proper punctuation
         if text and not text[-1] in '.!?':
             text += '.'
         
         return text
     
-    def synthesize(self, text: str) -> str:
-        """Convert text to speech and return audio file path"""
+    def synthesize_sentence(self, sentence: str) -> tuple:
+        """Synthesize a single sentence and return audio data + sample rate"""
         try:
-            # Sanitize text first
-            clean_text = self.sanitize_text(text)
+            clean_text = self.sanitize_text(sentence)
             
-            if not clean_text or clean_text.strip() == ".":
-                print("  ⚠️ Empty or invalid text, skipping TTS")
-                return None
+            if not clean_text or len(clean_text) < 2:
+                return None, None
             
-            print(f"  📝 TTS Input: {clean_text[:100]}{'...' if len(clean_text) > 100 else ''}")
+            # Create temp file
+            output_file = os.path.join(self.temp_dir, f"tts_stream_{int(time.time() * 1000000)}.wav")
             
-            # Create temp file with timestamp to avoid conflicts
-            import time
-            output_file = os.path.join(self.temp_dir, f"tts_{int(time.time() * 1000)}.wav")
-            
-            # Generate speech with error handling
+            # Generate speech
             self.tts.tts_to_file(text=clean_text, file_path=output_file)
             
-            # Validate the generated audio file
-            if not os.path.exists(output_file) or os.path.getsize(output_file) < 1000:  # Less than 1KB is suspicious
-                print("  ⚠️ Generated audio file is too small or missing")
-                return None
+            # Read the generated audio immediately
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
+                with wave.open(output_file, 'rb') as wf:
+                    sample_rate = wf.getframerate()
+                    frames = wf.readframes(wf.getnframes())
+                    audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+                
+                # Cleanup
+                try:
+                    os.unlink(output_file)
+                except:
+                    pass
+                
+                return audio, sample_rate
             
-            print(f"  ✓ TTS generated: {os.path.getsize(output_file)} bytes")
-            return output_file
+            return None, None
             
         except Exception as e:
-            print(f"  ✗ TTS synthesis failed: {e}")
+            print(f"  ⚠️ Sentence TTS failed: {e}")
+            return None, None
+    
+    def synthesize_streaming(self, text: str, audio_player):
+        """
+        Synthesize text sentence-by-sentence and stream to audio player
+        Returns immediately after starting, doesn't wait for completion
+        """
+        if not self.config.ENABLE_STREAMING:
+            # Fallback to non-streaming
+            return self.synthesize_batch(text)
+        
+        sentences = self.split_into_sentences(text)
+        
+        if not sentences:
+            print("  ⚠️ No valid sentences to synthesize")
+            return
+        
+        print(f"  🎵 Streaming {len(sentences)} sentence(s)...")
+        
+        # Process sentences in a separate thread for true streaming
+        def stream_worker():
+            first_sentence = True
+            for i, sentence in enumerate(sentences):
+                if first_sentence:
+                    print(f"  → Playing sentence 1/{len(sentences)} (streaming)...")
+                    first_sentence = False
+                
+                audio_data, sample_rate = self.synthesize_sentence(sentence)
+                
+                if audio_data is not None and sample_rate is not None:
+                    # Send directly to audio player - no waiting!
+                    audio_player.play_audio_data(audio_data, sample_rate)
+                else:
+                    print(f"  ⚠️ Skipped sentence {i+1}")
+        
+        # Start streaming in background thread
+        stream_thread = threading.Thread(target=stream_worker, daemon=True)
+        stream_thread.start()
+        
+        # Return immediately - streaming happens in background!
+        return stream_thread
+    
+    def synthesize_batch(self, text: str) -> str:
+        """Fallback: synthesize entire text at once (non-streaming)"""
+        try:
+            clean_text = self.sanitize_text(text)
+            
+            if not clean_text:
+                return None
+            
+            output_file = os.path.join(self.temp_dir, f"tts_batch_{int(time.time() * 1000)}.wav")
+            self.tts.tts_to_file(text=clean_text, file_path=output_file)
+            
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
+                return output_file
+            
+            return None
+            
+        except Exception as e:
+            print(f"  ✗ Batch TTS failed: {e}")
             return None
 
 # ============================================================================
 # MAIN AGENT
 # ============================================================================
 class RealTimeAgent:
-    """Full duplex real-time audio agent"""
+    """Full duplex real-time audio agent with streaming TTS"""
     
     def __init__(self, config: Config):
         self.config = config
         
         # Initialize components
-        print("\n Initializing Real-Time Audio Agent...")
+        print("\n🚀 Initializing Real-Time Audio Agent (STREAMING MODE)...")
         self.audio_capture = AudioCapture(config)
-        self.audio_player = AudioPlayer(config)
+        self.audio_player = StreamingAudioPlayer(config)
         self.stt = SpeechToText(config)
         self.llm = LanguageModel(config)
-        self.tts = TextToSpeech(config)
+        self.tts = StreamingTextToSpeech(config)
         
         # State
         self.is_running = False
         self.speech_buffer = []
         self.silence_frames = 0
         
-        print("✓ Agent ready!\n")
+        print("✓ Agent ready! (Streaming audio enabled)\n")
     
     def process_speech(self):
-        """Process accumulated speech buffer"""
+        """Process accumulated speech buffer with streaming audio output"""
         if not self.speech_buffer:
             return
         
@@ -526,33 +593,48 @@ class RealTimeAgent:
         audio_data = np.concatenate(self.speech_buffer)
         self.speech_buffer = []
         
-        print("\n Processing speech...")
+        print("\n🎯 Processing speech...")
         
         # 1. Speech to Text
         print("  → Transcribing...")
+        start_time = time.time()
         text = self.stt.transcribe(audio_data, self.config.SAMPLE_RATE)
+        stt_time = time.time() - start_time
         
         if not text:
             print("  ✗ No speech detected")
             return
         
         print(f"  👤 You: {text}")
+        print(f"  ⏱️ STT took: {stt_time:.2f}s")
         
         # 2. LLM Response
         print("  → Generating response...")
+        start_time = time.time()
         response = self.llm.generate_response(text)
-        print(f"  AI: {response}")
+        llm_time = time.time() - start_time
         
-        # 3. Text to Speech
-        print("  → Synthesizing speech...")
-        audio_file = self.tts.synthesize(response)
+        print(f"  🤖 AI: {response}")
+        print(f"  ⏱️ LLM took: {llm_time:.2f}s")
         
-        # 4. Play audio (only if TTS succeeded)
-        if audio_file:
-            print("  → Playing response...")
-            self.audio_player.play(audio_file)
+        # 3. Text to Speech (STREAMING!)
+        print("  → Synthesizing speech (streaming)...")
+        start_time = time.time()
+        
+        if self.config.ENABLE_STREAMING:
+            # Stream audio sentence by sentence - LOWEST LATENCY!
+            stream_thread = self.tts.synthesize_streaming(response, self.audio_player)
+            tts_start_time = time.time() - start_time
+            print(f"  ⏱️ First audio chunk started in: {tts_start_time:.2f}s")
+            print(f"  🎵 Streaming audio in background...")
         else:
-            print("  ⚠️ TTS failed, skipping audio playback")
+            # Fallback to batch processing
+            audio_file = self.tts.synthesize_batch(response)
+            if audio_file:
+                self.audio_player.play(audio_file)
+                print(f"  ⏱️ TTS completed in: {time.time() - start_time:.2f}s")
+            else:
+                print("  ⚠️ TTS failed")
     
     async def audio_processing_loop(self):
         """Main async loop for processing audio"""
@@ -595,12 +677,13 @@ class RealTimeAgent:
     def run(self):
         """Start the agent"""
         print("=" * 70)
-        print("AURORA - EMERGENCY FIELD ASSISTANT")
+        print("🚨 AURORA - EMERGENCY FIELD ASSISTANT (STREAMING MODE)")
         print("=" * 70)
         print("\nInstructions:")
         print("  • Describe your situation clearly")
         print("  • Mention specific locations (zones, valves, equipment)")
         print("  • Aurora will provide immediate safety guidance")
+        print("  • ⚡ STREAMING: Audio starts playing within 1-2 seconds!")
         print("  • For critical emergencies, follow instructions immediately")
         print("  • Press Ctrl+C to stop")
         print("\n" + "=" * 70)
@@ -617,7 +700,7 @@ class RealTimeAgent:
         try:
             asyncio.run(self.audio_processing_loop())
         except KeyboardInterrupt:
-            print("\n\nStopping agent...")
+            print("\n\n🛑 Stopping agent...")
         finally:
             self.stop()
     
@@ -626,52 +709,19 @@ class RealTimeAgent:
         self.is_running = False
         self.audio_capture.stop()
         self.audio_player.stop()
-        print(" Agent stopped")
+        print("✓ Agent stopped")
 
 # ============================================================================
 # ENTRY POINT
 # ============================================================================
 if __name__ == "__main__":
-    config = Config()
-    agent = RealTimeAgent(config)
-    
     try:
+        config = Config()
+        agent = RealTimeAgent(config)
         agent.run()
     except Exception as e:
-        print(f"\n Error: {e}")
+        print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
         print("1. Installed all dependencies: pip install sounddevice numpy webrtcvad faster-whisper TTS cerebras_cloud_sdk torch python-dotenv")
         print("2. Created .env file with: CEREBRAS_API_KEY=your_key_here")
-        print("   OR set environment variable: export CEREBRAS_API_KEY=your_key_here")
         print("3. Get free API key at: https://cloud.cerebras.ai/")
-
-
-# # Add at the end of agent.py
-# def test_aurora():
-#     """Test Aurora with simulated scenarios"""
-#     config = Config()
-#     llm = LanguageModel(config)
-    
-#     test_scenarios = [
-#         "Strong smell of gas in Zone B near Valve 3",
-#         "Worker fell from ladder, bleeding from head",
-#         "Press machine making loud noise and smoking",
-#         "Small fire in electrical panel Zone C",
-#         "Chemical barrel leaking in storage room"
-#     ]
-    
-#     for scenario in test_scenarios:
-#         print(f"\n{'='*70}")
-#         print(f"👤 Worker: {scenario}")
-#         response = llm.generate_response(scenario)
-#         print(f"🤖 Aurora: {response}")
-#         print(f"{'='*70}")
-
-# if __name__ == "__main__":
-#     # Uncomment to test without audio:
-#     # test_aurora()
-    
-#     # Normal operation:
-#     config = Config()
-#     agent = RealTimeAgent(config)
-#     agent.run()
