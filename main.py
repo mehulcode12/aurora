@@ -20,8 +20,6 @@ import docx
 import io
 import requests
 
-
-
 load_dotenv()
 
 app = FastAPI()
@@ -80,7 +78,6 @@ except redis.ConnectionError:
 #------------------------------------------------------------------------------------------
 
 
-# Pydantic Models
 class EmailRequest(BaseModel):
     email: EmailStr
 
@@ -88,7 +85,6 @@ class OTPResponse(BaseModel):
     success: bool
     message: str
 
-# Helper Functions
 def generate_otp() -> str:
     """Generate a 6-digit OTP"""
     return ''.join([str(random.randint(0, 9)) for _ in range(6)])
@@ -664,10 +660,19 @@ class GetActiveCallsResponse(BaseModel):
     success: bool
     active_calls: List[ActiveCall]
 
-def verify_access_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """Verify JWT access token and extract payload"""
+def verify_access_token_with_blacklist(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT access token and check blacklist"""
     try:
         token = credentials.credentials
+        
+        # Check if token is blacklisted
+        if is_token_blacklisted(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked. Please login again.",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         
         if payload.get("type") != "access":
@@ -683,7 +688,12 @@ def verify_access_token(credentials: HTTPAuthorizationCredentials = Depends(secu
                 detail="Invalid token payload"
             )
         
-        return {"admin_id": admin_id, "email": payload.get("email")}
+        return {
+            "admin_id": admin_id,
+            "email": payload.get("email"),
+            "token": token,
+            "exp": payload.get("exp")
+        }
     
     except JWTError:
         raise HTTPException(
@@ -719,7 +729,7 @@ def convert_timestamp(timestamp_value) -> str:
         return datetime.utcnow().isoformat() + "Z"
 
 @app.get("/get-active-calls", response_model=GetActiveCallsResponse, status_code=status.HTTP_200_OK)
-async def get_active_calls(token_data: dict = Depends(verify_access_token)):
+async def get_active_calls(token_data: dict = Depends(verify_access_token_with_blacklist)):
     """
     Get active calls for logged-in admin
     
@@ -781,6 +791,112 @@ async def get_active_calls(token_data: dict = Depends(verify_access_token)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve active calls"
         )
+
+
+#------------------------------------------------------------------------------------------
+#          6. GET /logout endpoint
+#------------------------------------------------------------------------------------------
+
+class LogoutResponse(BaseModel):
+    success: bool
+    message: str
+
+def verify_access_token_with_blacklist(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT access token and check blacklist"""
+    try:
+        token = credentials.credentials
+        
+        # Check if token is blacklisted
+        if is_token_blacklisted(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked. Please login again.",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        
+        admin_id = payload.get("sub")
+        if not admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload"
+            )
+        
+        return {
+            "admin_id": admin_id,
+            "email": payload.get("email"),
+            "token": token,
+            "exp": payload.get("exp")
+        }
+    
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+def is_token_blacklisted(token: str) -> bool:
+    """Check if token is in Redis blacklist"""
+    return redis_client.exists(f"blacklist:{token}") > 0
+
+def blacklist_token(token: str, exp: int):
+    """Add token to Redis blacklist with TTL"""
+    current_time = int(datetime.utcnow().timestamp())
+    ttl = exp - current_time
+    
+    if ttl > 0:
+        redis_client.setex(f"blacklist:{token}", ttl, "revoked")
+
+@app.post("/logout", response_model=LogoutResponse, status_code=status.HTTP_200_OK)
+async def logout(token_data: dict = Depends(verify_access_token_with_blacklist)):
+    """
+    Admin logout endpoint
+    
+    Invalidates the current JWT token by adding it to Redis blacklist
+    """
+    try:
+        admin_id = token_data["admin_id"]
+        token = token_data["token"]
+        exp = token_data["exp"]
+        
+        # Check if token is already blacklisted
+        if is_token_blacklisted(token):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token already invalidated"
+            )
+        
+        blacklist_token(token, exp)
+        
+        # Update last_logout timestamp in Firestore (optional)
+        firestore_db.collection('admins').document(admin_id).update({
+            'last_logout': firestore.SERVER_TIMESTAMP
+        })
+        
+        return LogoutResponse(
+            success=True,
+            message="Logged out successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in logout: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout failed. Please try again."
+        )
+
+
+
 
 
 if __name__ == "__main__":
