@@ -1,8 +1,0 @@
-{
-  "message": "Evacuate Zone B immediately! Shut down Valve 3 and call emergency services.",
-  "metadata": {
-    "context_from": "conversation_history",
-    "context_text": "User said: 'Strong smell of gas in Zone B near Valve 3'",
-    "urgency": "critical"
-  }
-}
