@@ -20,7 +20,7 @@ Setup Instructions:
 7. Call your Twilio number!
 """
 
-from flask import Flask, request, session
+from flask import Flask, request, session, jsonify
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.rest import Client
 from cerebras.cloud.sdk import Cerebras
@@ -28,6 +28,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 import json
+import uuid
 
 # Load environment variables
 load_dotenv()
@@ -48,11 +49,192 @@ class Config:
     # Voice settings
     TTS_VOICE = "Polly.Joanna"  # Amazon Polly voice (clear, professional)
     # Alternative voices: Polly.Matthew (male), Polly.Amy, Polly.Brian
+    SPEECH_RATE = "medium"  # Speech speed options:
+    # - "slow" (slower than normal)
+    # - "medium" (normal speed) 
+    # - "fast" (faster than normal)
+    # - Specific rate: 0.5 (half speed) to 2.0 (double speed)
+    # - Examples: 0.8, 1.2, 1.5
     
     # Conversation settings
     SPEECH_TIMEOUT = "auto"  # Auto-detect when user stops speaking
     GATHER_TIMEOUT = 5  # Seconds to wait for speech
     MAX_CONVERSATION_LENGTH = 20  # Maximum exchanges per call
+
+# ============================================================================
+# ACTIVE CALLS MANAGER (Frontend Structure)
+# ============================================================================
+class ActiveCallsManager:
+    """Manages active calls and conversations in frontend-compatible structure"""
+    
+    def __init__(self):
+        self.active_calls_dir = "active_calls"
+        self.total_file = os.path.join(self.active_calls_dir, "total.json")
+        try:
+            os.makedirs(self.active_calls_dir, exist_ok=True)
+            print(f"📁 Active calls directory created/verified: {os.path.abspath(self.active_calls_dir)}")
+        except Exception as e:
+            print(f"❌ Error creating active calls directory: {e}")
+            # Fallback to current directory
+            self.active_calls_dir = "."
+            self.total_file = "total.json"
+            print(f"📁 Using fallback directory: {os.path.abspath(self.active_calls_dir)}")
+    
+    def _load_data(self):
+        """Load existing data or create new structure"""
+        try:
+            if os.path.exists(self.total_file):
+                with open(self.total_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                data = {
+                    "active_calls": {},
+                    "active_conversations": {}
+                }
+            return data
+        except Exception as e:
+            print(f"❌ Error loading data: {e}")
+            return {"active_calls": {}, "active_conversations": {}}
+    
+    def _save_data(self, data):
+        """Save data to total.json"""
+        try:
+            print(f"📁 Attempting to save to: {self.total_file}")
+            with open(self.total_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            print(f"📁 Data saved successfully")
+            return True
+        except Exception as e:
+            print(f"❌ Error saving data: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            print(f"❌ Filepath: {self.total_file}")
+            return False
+    
+    def _generate_call_id(self, phone_number):
+        """Generate unique call ID based on phone number"""
+        clean_phone = phone_number.replace('+', '').replace('-', '').replace(' ', '')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f"call_{clean_phone}_{timestamp}"
+    
+    def _generate_conv_id(self, call_id):
+        """Generate conversation ID from call ID"""
+        return f"conv_{call_id.split('_', 1)[1]}"
+    
+    def _generate_msg_id(self, conv_id, message_count):
+        """Generate message ID"""
+        return f"msg_{conv_id.split('_', 1)[1]}_{message_count:04d}"
+    
+    def add_conversation_entry(self, phone_number, user_query, aurora_response, urgency_level, call_sid=None):
+        """Add a new conversation entry following frontend structure"""
+        try:
+            data = self._load_data()
+            
+            # Check if this phone number already has an active call
+            existing_call_id = None
+            for call_id, call_data in data["active_calls"].items():
+                if call_data["mobile_no"] == phone_number and call_data["status"] == "ACTIVE":
+                    existing_call_id = call_id
+                    break
+            
+            if existing_call_id:
+                # Update existing call
+                call_id = existing_call_id
+                conv_id = data["active_calls"][call_id]["conversation_id"]
+            else:
+                # Create new call and conversation
+                call_id = self._generate_call_id(phone_number)
+                conv_id = self._generate_conv_id(call_id)
+                
+                # Add to active_calls
+                data["active_calls"][call_id] = {
+                    "worker_id": f"worker_{phone_number.replace('+', '').replace('-', '')}",
+                    "mobile_no": phone_number,
+                    "conversation_id": conv_id,
+                    "urgency": urgency_level.upper(),
+                    "status": "ACTIVE",
+                    "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
+                    "medium": "Voice",
+                    "last_message_at": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+                }
+                
+                # Initialize conversation
+                data["active_conversations"][conv_id] = {
+                    "call_id": call_id,
+                    "messages": {}
+                }
+            
+            # Add messages to conversation
+            conv_data = data["active_conversations"][conv_id]
+            message_count = len(conv_data["messages"])
+            
+            # Add user message
+            user_msg_id = self._generate_msg_id(conv_id, message_count + 1)
+            conv_data["messages"][user_msg_id] = {
+                "role": "user",
+                "content": user_query,
+                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+            }
+            
+            # Add assistant message
+            assistant_msg_id = self._generate_msg_id(conv_id, message_count + 2)
+            conv_data["messages"][assistant_msg_id] = {
+                "role": "assistant",
+                "content": aurora_response,
+                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+            }
+            
+            # Update call urgency and last message time
+            data["active_calls"][call_id]["urgency"] = urgency_level.upper()
+            data["active_calls"][call_id]["last_message_at"] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+            
+            # Save updated data
+            if self._save_data(data):
+                print(f"📁 Conversation updated for {phone_number}: {call_id}")
+                return call_id, conv_id
+            else:
+                return None, None
+            
+        except Exception as e:
+            print(f"❌ Error updating conversation: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            return None, None
+    
+    def get_all_data(self):
+        """Get all active calls and conversations data"""
+        try:
+            return self._load_data()
+        except Exception as e:
+            print(f"❌ Error getting all data: {e}")
+            return {"active_calls": {}, "active_conversations": {}}
+    
+    def get_call_data(self, call_id):
+        """Get specific call data"""
+        try:
+            data = self._load_data()
+            if call_id in data["active_calls"]:
+                return {
+                    "call": data["active_calls"][call_id],
+                    "conversation": data["active_conversations"].get(data["active_calls"][call_id]["conversation_id"], {})
+                }
+            return None
+        except Exception as e:
+            print(f"❌ Error getting call data: {e}")
+            return None
+    
+    def end_call(self, call_id):
+        """Mark a call as ended"""
+        try:
+            data = self._load_data()
+            if call_id in data["active_calls"]:
+                data["active_calls"][call_id]["status"] = "ENDED"
+                return self._save_data(data)
+            return False
+        except Exception as e:
+            print(f"❌ Error ending call: {e}")
+            return False
+
+# Initialize active calls manager
+active_calls_manager = ActiveCallsManager()
 
 # ============================================================================
 # CONVERSATION MANAGER
@@ -144,28 +326,35 @@ class AuroraLLM:
         self.client = Cerebras(api_key=config.CEREBRAS_API_KEY)
         print("✓ Aurora LLM initialized")
         
-        # System prompt for phone-based emergency assistance
-        self.system_prompt = """You are Aurora, an AI emergency assistant for industrial workers calling via phone.
+        # System prompt for phone-based industrial assistance
+        self.system_prompt = """You are Aurora, an AI assistant for industrial workers calling via phone.
 
-CRITICAL PHONE CONVERSATION GUIDELINES:
-1. Be EXTREMELY CONCISE - phone conversations require brevity
+PHONE CONVERSATION GUIDELINES:
+1. Be CONCISE - phone conversations require brevity
 2. Use SHORT sentences - easier to understand over phone
 3. Speak CLEARLY - avoid complex words or jargon
 4. ONE instruction at a time - don't overwhelm the caller
-5. REPEAT critical information - ensure understanding
-6. Ask for CONFIRMATION - "Do you understand? Say yes or no."
+5. REPEAT important information - ensure understanding
+6. Ask for CONFIRMATION when needed - "Do you understand? Say yes or no."
 
 Your core mission:
-- Provide IMMEDIATE, ACTIONABLE safety guidance
-- Identify hazards: gas leaks, fires, injuries, equipment failures
-- Give clear step-by-step emergency instructions
-- Prioritize worker safety above all else
+- Provide IMMEDIATE, ACTIONABLE guidance for work situations
+- Help with both routine tasks and emergency situations
+- Give clear step-by-step instructions
+- Prioritize worker safety and efficiency
 
-Response structure for emergencies:
+Response structure:
+For EMERGENCIES (gas leaks, fires, injuries, equipment failures):
 1. IMMEDIATE ACTION (1 sentence): "Evacuate now."
 2. SAFETY STEP (1 sentence): "Shut Valve 3 if safe."
 3. ALERT (1 sentence): "Call fire brigade immediately."
 4. CONFIRMATION: "Did you understand? Say yes or no."
+
+For REGULAR ASSISTANCE (procedures, troubleshooting, guidance):
+1. UNDERSTAND the situation: Ask clarifying questions if needed
+2. PROVIDE clear steps: Break down complex tasks
+3. OFFER alternatives: Suggest backup options when possible
+4. CONFIRM understanding: "Does this help? Any questions?"
 
 Zone layout:
 - Zone A: Manufacturing floor, press machines
@@ -175,19 +364,27 @@ Zone layout:
 - Zone E: Maintenance workshop
 - Zone F: Loading dock
 
-Emergency protocols:
+Emergency protocols (when situation is critical):
 - Gas leak → Evacuate, shut valves, eliminate ignition, call gas team + fire brigade
 - Fire → Evacuate, activate alarms, use extinguisher if safe, call fire brigade
 - Chemical spill → Evacuate, contain if safe, call hazmat team
 - Injury → First aid, call ambulance, don't move victim unless danger
 - Equipment failure → Shut down, isolate area, call maintenance
 
+Regular assistance areas:
+- Equipment operation procedures
+- Troubleshooting common issues
+- Safety protocol questions
+- Process optimization suggestions
+- Training and guidance requests
+
 PHONE-SPECIFIC RULES:
-- Maximum 3 sentences per response
+- Maximum 3-4 sentences per response
 - Use simple words only
 - Pause between instructions (use periods)
 - Always end critical instructions with confirmation request
-- If caller seems confused, repeat in simpler terms
+- For emergencies, prioritize safety above all else
+- For regular assistance, be helpful and thorough
 
 Remember: This is a PHONE CALL. Keep it SHORT and CLEAR."""
     
@@ -199,27 +396,66 @@ Remember: This is a PHONE CALL. Keep it SHORT and CLEAR."""
         messages.extend(conversation_history)
         messages.append({"role": "user", "content": user_input})
         
-        # Detect urgency
-        urgent_keywords = ['gas', 'leak', 'fire', 'injured', 'emergency', 
-                          'help', 'danger', 'smoke', 'bleeding', 'explosion']
-        is_urgent = any(keyword in user_input.lower() for keyword in urgent_keywords)
-        
         try:
+            # Enhanced system prompt to include urgency classification
+            enhanced_system_prompt = self.system_prompt + """
+
+IMPORTANT: After providing your response, you MUST also classify the urgency level.
+Add this exact format at the end of your response:
+[URGENCY: critical/urgent/normal/assistive]
+
+Urgency levels:
+- "critical": life-threatening, immediate danger (gas leaks, fires, explosions, severe injuries)
+- "urgent": serious but not immediately life-threatening (injuries, equipment failures, safety hazards)
+- "normal": routine work situation (status updates, general questions)
+- "assistive": asking for help, guidance, or procedures (how-to questions, troubleshooting)
+
+Example response:
+"Evacuate immediately. Shut Valve 3 if safe. Call fire brigade now. [URGENCY: critical]"
+"""
+            
+            # Build messages with enhanced system prompt
+            enhanced_messages = [{"role": "system", "content": enhanced_system_prompt}]
+            enhanced_messages.extend(conversation_history)
+            enhanced_messages.append({"role": "user", "content": user_input})
+            
             # Call Cerebras API
             response = self.client.chat.completions.create(
                 model=self.config.CEREBRAS_MODEL,
-                messages=messages,
-                max_tokens=150,  # Keep responses very short for phone
+                messages=enhanced_messages,
+                max_tokens=200,  # Increased to accommodate urgency classification
                 temperature=0.2,  # Very low for consistent safety instructions
             )
             
-            assistant_message = response.choices[0].message.content
+            full_response = response.choices[0].message.content
             
-            return assistant_message, is_urgent
+            # Extract urgency level from response
+            urgency_level = "normal"  # Default
+            if "[URGENCY:" in full_response:
+                try:
+                    urgency_start = full_response.find("[URGENCY:") + 9
+                    urgency_end = full_response.find("]", urgency_start)
+                    urgency_level = full_response[urgency_start:urgency_end].strip().lower()
+                    
+                    # Validate urgency level
+                    valid_levels = ["critical", "urgent", "normal", "assistive"]
+                    if urgency_level not in valid_levels:
+                        urgency_level = "normal"
+                        
+                    # Remove urgency classification from response
+                    assistant_message = full_response[:full_response.find("[URGENCY:")].strip()
+                except Exception as e:
+                    print(f"❌ Urgency parsing error: {e}")
+                    assistant_message = full_response
+                    urgency_level = "normal"
+            else:
+                assistant_message = full_response
+            
+            return assistant_message, urgency_level
             
         except Exception as e:
             print(f"❌ LLM Error: {e}")
-            return "Emergency system error. Please call your supervisor at extension 9999 immediately.", True
+            return "Emergency system error. Please call your supervisor at extension 9999 immediately.", "critical"
 
 # ============================================================================
 # FLASK APP
@@ -267,11 +503,22 @@ def home():
     <p>Status: <strong>Online</strong></p>
     <p>Endpoints:</p>
     <ul>
-        <li>POST /incoming-call - Handle incoming calls</li>
-        <li>POST /process-speech - Process worker speech</li>
+        <li>POST /incoming-call - Handle incoming calls (returns TwiML)</li>
+        <li>POST /process-speech - Process worker speech (returns TwiML)</li>
         <li>POST /call-status - Call status updates</li>
+        <li>POST /api/process-speech - Process speech (returns JSON)</li>
+        <li>GET /api/active-calls - Get all active calls and conversations</li>
+        <li>GET /api/call/&lt;call_id&gt; - Get specific call data</li>
+        <li>POST /api/call/&lt;call_id&gt;/end - End a specific call</li>
     </ul>
     <p>Powered by Cerebras AI + Twilio</p>
+    <p><strong>JSON API Response Format:</strong></p>
+    <ul>
+        <li><code>message</code> - Aurora's response text</li>
+        <li><code>ph_no</code> - Caller's phone number</li>
+        <li><code>urgency</code> - Urgency level (critical, urgent, normal, assistive)</li>
+    </ul>
+    <p><strong>Active Calls Structure:</strong> Data saved in <code>active_calls/total.json</code> with frontend-compatible structure</p>
     <p><strong>Note:</strong> Twilio webhooks sent to root path will be automatically redirected to /incoming-call</p>
     """
 
@@ -289,17 +536,18 @@ def incoming_call():
     # Initialize conversation
     conversation_manager.get_conversation(call_sid)
     
-    # Create response
+    # Create TwiML response
     response = VoiceResponse()
     
     # Greeting
     greeting = (
-        "Aurora emergency assistant. "
-        "Describe your situation clearly. "
+        "Aurora industrial assistant. "
+        "How can I help you today? "
+        "Describe your situation or question. "
         "Speak now."
     )
     
-    response.say(greeting, voice=config.TTS_VOICE)
+    response.say(greeting, voice=config.TTS_VOICE, rate=config.SPEECH_RATE)
     
     # Gather speech input
     gather = Gather(
@@ -313,8 +561,8 @@ def incoming_call():
     response.append(gather)
     
     # If no input, prompt again
-    response.say("I didn't hear anything. Please describe your situation.", 
-                 voice=config.TTS_VOICE)
+    response.say("I didn't hear anything. Please describe your situation or question.", 
+                 voice=config.TTS_VOICE, rate=config.SPEECH_RATE)
     response.redirect('/incoming-call')
     
     return str(response)
@@ -341,7 +589,7 @@ def process_speech():
             "Maximum conversation length reached. "
             "Please call back if you need further assistance. "
             "Goodbye.",
-            voice=config.TTS_VOICE
+            voice=config.TTS_VOICE, rate=config.SPEECH_RATE
         )
         response.hangup()
         conversation_manager.end_conversation(call_sid)
@@ -351,55 +599,163 @@ def process_speech():
     if not speech_result or len(speech_result.strip()) < 3:
         response = VoiceResponse()
         response.say(
-            "I couldn't understand that. Please speak clearly and describe your situation.",
-            voice=config.TTS_VOICE
+            "I couldn't understand that. Please speak clearly and describe your situation or question.",
+            voice=config.TTS_VOICE, rate=config.SPEECH_RATE
         )
         response.redirect('/incoming-call')
         return str(response)
     
-    # Add to conversation history
-    conversation_manager.add_message(call_sid, "user", speech_result)
-    
-    # Generate Aurora's response
-    conversation_history = conversation_manager.get_history(call_sid)
-    aurora_response, is_urgent = aurora_llm.generate_response(conversation_history, speech_result)
-    
-    # Add Aurora's response to history
-    conversation_manager.add_message(call_sid, "assistant", aurora_response)
-    
-    # Log critical situations
-    if is_urgent:
-        conversation_manager.add_critical_alert(call_sid, {
-            "worker_message": speech_result,
-            "aurora_response": aurora_response
+    try:
+        # Add to conversation history
+        conversation_manager.add_message(call_sid, "user", speech_result)
+        
+        # Generate Aurora's response
+        conversation_history = conversation_manager.get_history(call_sid)
+        aurora_response, urgency_level = aurora_llm.generate_response(conversation_history, speech_result)
+        
+        # Add Aurora's response to history
+        conversation_manager.add_message(call_sid, "assistant", aurora_response)
+        
+        # Log critical situations
+        if urgency_level in ["critical", "urgent"]:
+            conversation_manager.add_critical_alert(call_sid, {
+                "worker_message": speech_result,
+                "aurora_response": aurora_response,
+                "urgency_level": urgency_level
+            })
+            print(f"   ⚠️ {urgency_level.upper()} SITUATION DETECTED")
+        
+        print(f"   🤖 Aurora: {aurora_response}")
+        print(f"   📊 Urgency Level: {urgency_level}")
+        
+        # Save to active calls structure
+        phone_number = request.form.get('From', 'Unknown')
+        call_id, conv_id = active_calls_manager.add_conversation_entry(
+            phone_number=phone_number,
+            user_query=speech_result,
+            aurora_response=aurora_response,
+            urgency_level=urgency_level,
+            call_sid=call_sid
+        )
+        
+        # Create TwiML response
+        response = VoiceResponse()
+        response.say(aurora_response, voice=config.TTS_VOICE, rate=config.SPEECH_RATE)
+        
+        # Continue conversation
+        gather = Gather(
+            input='speech',
+            action='/process-speech',
+            timeout=config.GATHER_TIMEOUT,
+            speech_timeout=config.SPEECH_TIMEOUT,
+            language='en-US'
+        )
+        
+        response.append(gather)
+        
+        # If no further input, end call
+        response.say(
+            "If you need more help, please call back. Stay safe. Goodbye.",
+            voice=config.TTS_VOICE, rate=config.SPEECH_RATE
+        )
+        response.hangup()
+        
+        return str(response)
+        
+    except Exception as e:
+        print(f"❌ Processing error: {e}")
+        # Return TwiML error response
+        response = VoiceResponse()
+        response.say(
+            "I'm experiencing technical difficulties. Please call back in a moment or contact your supervisor.",
+            voice=config.TTS_VOICE, rate=config.SPEECH_RATE
+        )
+        response.hangup()
+        return str(response)
+
+@app.route("/api/process-speech", methods=['POST'])
+def api_process_speech():
+    """API endpoint for processing speech and returning JSON response"""
+    try:
+        # Get data from request (can be form data or JSON)
+        if request.is_json:
+            data = request.get_json()
+            speech_result = data.get('speech', '')
+            phone_number = data.get('ph_no', 'Unknown')
+        else:
+            speech_result = request.form.get('SpeechResult', '')
+            phone_number = request.form.get('From', 'Unknown')
+        
+        if not speech_result or len(speech_result.strip()) < 3:
+            return jsonify({
+                "message": "I couldn't understand that. Please provide clear speech input.",
+                "ph_no": phone_number,
+                "urgency": "normal"
+            })
+        
+        # Generate Aurora's response
+        aurora_response, urgency_level = aurora_llm.generate_response([], speech_result)
+        
+        print(f"   🤖 Aurora: {aurora_response}")
+        print(f"   📊 Urgency Level: {urgency_level}")
+        
+        # Save to active calls structure
+        call_id, conv_id = active_calls_manager.add_conversation_entry(
+            phone_number=phone_number,
+            user_query=speech_result,
+            aurora_response=aurora_response,
+            urgency_level=urgency_level
+        )
+        
+        # Prepare JSON response
+        json_response = {
+            "message": aurora_response,
+            "ph_no": phone_number,
+            "urgency": urgency_level
+        }
+        
+        return jsonify(json_response)
+        
+    except Exception as e:
+        print(f"❌ API Processing error: {e}")
+        return jsonify({
+            "message": "I'm experiencing technical difficulties. Please try again later.",
+            "ph_no": request.form.get('From', 'Unknown'),
+            "urgency": "normal"
         })
-        print(f"   ⚠️ CRITICAL SITUATION DETECTED")
-    
-    print(f"   🤖 Aurora: {aurora_response}")
-    
-    # Create response
-    response = VoiceResponse()
-    response.say(aurora_response, voice=config.TTS_VOICE)
-    
-    # Continue conversation
-    gather = Gather(
-        input='speech',
-        action='/process-speech',
-        timeout=config.GATHER_TIMEOUT,
-        speech_timeout=config.SPEECH_TIMEOUT,
-        language='en-US'
-    )
-    
-    response.append(gather)
-    
-    # If no further input, end call
-    response.say(
-        "If you need more help, please call back. Stay safe. Goodbye.",
-        voice=config.TTS_VOICE
-    )
-    response.hangup()
-    
-    return str(response)
+
+@app.route("/api/active-calls", methods=['GET'])
+def get_active_calls():
+    """Get all active calls and conversations data"""
+    try:
+        data = active_calls_manager.get_all_data()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": f"Error retrieving active calls: {e}"}), 500
+
+@app.route("/api/call/<call_id>", methods=['GET'])
+def get_call_data(call_id):
+    """Get specific call data"""
+    try:
+        call_data = active_calls_manager.get_call_data(call_id)
+        if call_data:
+            return jsonify(call_data)
+        else:
+            return jsonify({"error": "Call not found"}), 404
+    except Exception as e:
+        return jsonify({"error": f"Error retrieving call data: {e}"}), 500
+
+@app.route("/api/call/<call_id>/end", methods=['POST'])
+def end_call(call_id):
+    """End a specific call"""
+    try:
+        success = active_calls_manager.end_call(call_id)
+        if success:
+            return jsonify({"message": "Call ended successfully"})
+        else:
+            return jsonify({"error": "Failed to end call"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error ending call: {e}"}), 500
 
 @app.route("/call-status", methods=['POST'])
 def call_status():
@@ -428,7 +784,7 @@ def hangup():
     conversation_manager.end_conversation(call_sid)
     
     response = VoiceResponse()
-    response.say("Goodbye. Stay safe.", voice=config.TTS_VOICE)
+    response.say("Goodbye. Stay safe.", voice=config.TTS_VOICE, rate=config.SPEECH_RATE)
     response.hangup()
     
     return str(response)
