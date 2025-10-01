@@ -1,28 +1,41 @@
 # main.py or routes/auth.py
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, File, UploadFile, Form, Header
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel, EmailStr
 import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import redis
-from firebase_admin import credentials, firestore, initialize_app
-from typing import Optional
+import firebase_admin
+from firebase_admin import credentials, firestore, initialize_app, auth
+from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
-# Load environment variables
+from groq import Groq
+import PyPDF2
+import docx
+import io
+
+
 load_dotenv()
 
-# Initialize FastAPI
 app = FastAPI()
+security = HTTPBearer()
 
 # Initialize Firebase
 cred = credentials.Certificate("serviceAccountKey.json")
 initialize_app(cred)
 db = firestore.client()
+
+# SMTP Configuration
+SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+SMTP_EMAIL = os.getenv('SMTP_EMAIL')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')  # App password for Gmail
 
 # Initialize Redis client
 redis_client = redis.Redis(
@@ -42,6 +55,11 @@ except redis.ConnectionError:
     print("Run Redis Server > cd C:\Redis-x64-3.0.504 && redis-server.exe redis.windows.conf")
     print("---------------------------------------------------------------------------------\n")
 
+
+#------------------------------------------------------------------------------------------
+#          1. GET /get-otp endpoint
+#------------------------------------------------------------------------------------------
+
 # Pydantic Models
 class EmailRequest(BaseModel):
     email: EmailStr
@@ -49,12 +67,6 @@ class EmailRequest(BaseModel):
 class OTPResponse(BaseModel):
     success: bool
     message: str
-
-# SMTP Configuration
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-SMTP_EMAIL = os.getenv('SMTP_EMAIL')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')  # App password for Gmail
 
 # Helper Functions
 def generate_otp() -> str:
@@ -202,6 +214,299 @@ async def check_redis():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Redis is not connected"
         )
+
+
+#------------------------------------------------------------------------------------------
+#          2. POST /verify-otp endpoint
+#------------------------------------------------------------------------------------------
+
+# JWT Configuration
+SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
+ALGORITHM = "HS256"
+TEMP_TOKEN_EXPIRE_MINUTES = 15
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class VerifyOTPResponse(BaseModel):
+    success: bool
+    temp_token: str
+    expires_in: int
+
+def create_temp_token(email: str) -> str:
+    """Generate temporary JWT token valid for 15 minutes"""
+    expire = datetime.utcnow() + timedelta(minutes=TEMP_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": email,
+        "type": "temp",
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+@app.post("/verify-otp", response_model=VerifyOTPResponse, status_code=status.HTTP_200_OK)
+async def verify_otp(request: VerifyOTPRequest):
+    """
+    Verify OTP and generate temporary token
+    
+    - **email**: User's email address
+    - **otp**: 6-digit OTP received via email
+    """
+    try:
+        email = request.email.lower().strip()
+        otp = request.otp.strip()
+        
+        stored_otp = redis_client.get(f"otp:{email}")
+        
+        if not stored_otp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP expired or invalid. Please request a new OTP."
+            )
+        
+        if stored_otp != otp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OTP. Please check and try again."
+            )
+        
+        redis_client.delete(f"otp:{email}")
+        
+        temp_token = create_temp_token(email)
+        
+        return VerifyOTPResponse(
+            success=True,
+            temp_token=temp_token,
+            expires_in=900  # 15 minutes
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in verify_otp: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again."
+        )
+
+
+#------------------------------------------------------------------------------------------
+#          3. POST /sign-up endpoint
+#------------------------------------------------------------------------------------------
+
+# Initialize Groq
+groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+
+# JWT Configuration
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = "HS256"
+
+class SignUpResponse(BaseModel):
+    success: bool
+    admin_id: str
+    message: str
+
+def verify_temp_token(token: str) -> str:
+    """Verify temporary token and extract email"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        if payload.get("type") != "temp":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload"
+            )
+        
+        return email
+    
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired or invalid"
+        )
+
+def extract_text_from_pdf(file_content: bytes) -> str:
+    """Extract text from PDF file"""
+    try:
+        pdf_file = io.BytesIO(file_content)
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        print(f"Error extracting PDF: {str(e)}")
+        return ""
+
+def extract_text_from_docx(file_content: bytes) -> str:
+    """Extract text from DOCX file"""
+    try:
+        doc_file = io.BytesIO(file_content)
+        doc = docx.Document(doc_file)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        return text
+    except Exception as e:
+        print(f"Error extracting DOCX: {str(e)}")
+        return ""
+
+def extract_text_from_txt(file_content: bytes) -> str:
+    """Extract text from TXT file"""
+    try:
+        return file_content.decode('utf-8')
+    except Exception as e:
+        print(f"Error extracting TXT: {str(e)}")
+        return ""
+
+async def process_files_with_groq(files: List[UploadFile]) -> str:
+    """Extract and process content from multiple files using Groq API"""
+    all_text = ""
+    
+    for file in files:
+        content = await file.read()
+        filename = file.filename.lower()
+        
+        if filename.endswith('.pdf'):
+            extracted_text = extract_text_from_pdf(content)
+        elif filename.endswith('.docx'):
+            extracted_text = extract_text_from_docx(content)
+        elif filename.endswith('.txt'):
+            extracted_text = extract_text_from_txt(content)
+        else:
+            continue
+        
+        all_text += f"\n--- {file.filename} ---\n{extracted_text}\n"
+    
+    # Use Groq to process and structure the extracted text
+    try:
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert at analyzing SOP manuals and documentation. Extract and organize key information, procedures, and guidelines from the provided text. Structure the content clearly and maintain important details."
+                },
+                {
+                    "role": "user",
+                    "content": f"Process and structure the following SOP manual content:\n\n{all_text}"
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.3,
+            max_tokens=8000
+        )
+        
+        processed_content = chat_completion.choices[0].message.content
+        return processed_content
+    
+    except Exception as e:
+        print(f"Error processing with Groq: {str(e)}")
+        return all_text
+
+@app.post("/sign-up", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED)
+async def sign_up(
+    temp_token: str = Form(...),
+    name: str = Form(...),
+    email: EmailStr = Form(...),
+    password: str = Form(...),
+    company_name: str = Form(...),
+    designation: str = Form(...),
+    files: List[UploadFile] = File(...)
+    ):
+    """
+    Admin sign-up with SOP manual upload
+    
+    - **temp_token**: Temporary token from verify-otp
+    - **name**: Admin full name
+    - **email**: Admin email address
+    - **password**: Admin password
+    - **company_name**: Company name
+    - **designation**: Job designation
+    - **files**: SOP manual files (PDF, DOCX, TXT)
+    """
+    try:
+        email = email.lower().strip()
+        
+        # Verify temp token and extract email
+        token_email = verify_temp_token(temp_token)
+        
+        # Validate email matches token payload
+        if token_email != email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email does not match token"
+            )
+        
+        # Check if admin already exists
+        admins_ref = db.collection('admins')
+        existing_admin = admins_ref.where('email', '==', email).limit(1).get()
+        if len(existing_admin) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Admin already exists"
+            )
+        
+        # Extract content from files using Groq API
+        processed_content = await process_files_with_groq(files)
+        
+        # Create document in sops_manuals collection
+        sops_ref = db.collection('sops_manuals')
+        sop_doc_ref = sops_ref.add({
+            'sop_manual_guidelines': processed_content,
+        })
+        sop_manual_id = sop_doc_ref[1].id
+        
+        # Create Firebase Auth user
+        firebase_user = auth.create_user(
+            email=email,
+            password=password,
+            display_name=name
+        )
+        
+        # Store admin details in admins collection using firebase_user.uid as document ID
+        admin_doc_ref = admins_ref.document(firebase_user.uid)
+        admin_doc_ref.set({
+            'email': email,
+            'name': name,
+            'company_name': company_name,
+            'designation': designation,
+            'sop_manuals_id': sop_manual_id,
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'last_login': None
+        })
+        admin_id = firebase_user.uid
+        
+        return SignUpResponse(
+            success=True,
+            admin_id=admin_id,
+            message="Admin registered successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in sign_up: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration failed: {str(e)}"
+        )
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     import uvicorn
