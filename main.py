@@ -20,6 +20,9 @@ import PyPDF2
 import docx
 import io
 
+import requests
+
+
 
 load_dotenv()
 
@@ -31,11 +34,27 @@ cred = credentials.Certificate("serviceAccountKey.json")
 initialize_app(cred)
 db = firestore.client()
 
+# Firebase Web API Key
+FIREBASE_WEB_API_KEY = os.getenv('FIREBASE_WEB_API_KEY')
+
+# JWT Configuration
+SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
+ALGORITHM = "HS256"
+TEMP_TOKEN_EXPIRE_MINUTES = 15
+ACCESS_TOKEN_EXPIRE_HOURS = 24
+
+# Initialize Groq
+groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+
+# JWT Configuration
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = "HS256"
+
 # SMTP Configuration
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 SMTP_EMAIL = os.getenv('SMTP_EMAIL')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')  # App password for Gmail
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 
 # Initialize Redis client
 redis_client = redis.Redis(
@@ -59,6 +78,7 @@ except redis.ConnectionError:
 #------------------------------------------------------------------------------------------
 #          1. GET /get-otp endpoint
 #------------------------------------------------------------------------------------------
+
 
 # Pydantic Models
 class EmailRequest(BaseModel):
@@ -220,10 +240,6 @@ async def check_redis():
 #          2. POST /verify-otp endpoint
 #------------------------------------------------------------------------------------------
 
-# JWT Configuration
-SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
-ALGORITHM = "HS256"
-TEMP_TOKEN_EXPIRE_MINUTES = 15
 
 class VerifyOTPRequest(BaseModel):
     email: EmailStr
@@ -296,12 +312,6 @@ async def verify_otp(request: VerifyOTPRequest):
 #          3. POST /sign-up endpoint
 #------------------------------------------------------------------------------------------
 
-# Initialize Groq
-groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
-
-# JWT Configuration
-SECRET_KEY = os.getenv('SECRET_KEY')
-ALGORITHM = "HS256"
 
 class SignUpResponse(BaseModel):
     success: bool
@@ -501,8 +511,136 @@ async def sign_up(
         )
 
 
+#------------------------------------------------------------------------------------------
+#          4. POST /login endpoint
+#------------------------------------------------------------------------------------------
 
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminProfile(BaseModel):
+    admin_id: str
+    email: str
+    name: str
+    company_name: str
+    designation: str
+
+class LoginResponse(BaseModel):
+    success: bool
+    access_token: str
+    admin: AdminProfile
+
+def authenticate_with_firebase(email: str, password: str) -> dict:
+    """Authenticate user with Firebase Auth REST API"""
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_WEB_API_KEY}"
+    
+    payload = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    
+    response = requests.post(url, json=payload)
+    
+    if response.status_code != 200:
+        error_data = response.json()
+        error_message = error_data.get('error', {}).get('message', 'Authentication failed')
+        
+        if error_message == "EMAIL_NOT_FOUND":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email not found"
+            )
+        elif error_message == "INVALID_PASSWORD":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid password"
+            )
+        elif error_message == "USER_DISABLED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account has been disabled"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication failed"
+            )
+    
+    return response.json()
+
+def create_access_token(admin_id: str, email: str) -> str:
+    """Generate JWT access token valid for 24 hours"""
+    expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": admin_id,
+        "email": email,
+        "type": "access",
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+@app.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+async def login(request: LoginRequest):
+    """
+    Admin login endpoint
+    
+    - **email**: Admin email address
+    - **password**: Admin password
+    """
+    try:
+        email = request.email.lower().strip()
+        
+        firebase_response = authenticate_with_firebase(email, request.password)
+        firebase_uid = firebase_response.get('localId')
+        
+        # Verify user exists in admins collection
+        admins_ref = db.collection('admins')
+        admin_query = admins_ref.where('email', '==', email).limit(1).get()
+        
+        if len(admin_query) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Admin profile not found"
+            )
+        
+        admin_doc = admin_query[0]
+        admin_data = admin_doc.to_dict()
+        admin_id = admin_doc.id
+        
+        # Update last_login
+        admins_ref.document(admin_id).update({
+            'last_login': firestore.SERVER_TIMESTAMP
+        })
+        
+        access_token = create_access_token(admin_id, email)
+        
+        admin_profile = AdminProfile(
+            admin_id=admin_id,
+            email=admin_data['email'],
+            name=admin_data['name'],
+            company_name=admin_data['company_name'],
+            designation=admin_data['designation']
+        )
+        
+        return LoginResponse(
+            success=True,
+            access_token=access_token,
+            admin=admin_profile
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in login: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed. Please try again."
+        )
 
 
 
