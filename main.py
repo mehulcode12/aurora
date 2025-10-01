@@ -1,6 +1,6 @@
 # main.py or routes/auth.py
-from fastapi import FastAPI, HTTPException, status, File, UploadFile, Form, Header
-from fastapi.security import HTTPBearer
+from fastapi import FastAPI, HTTPException, status, Depends, File, UploadFile, Form, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 import random
 import smtplib
@@ -8,18 +8,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import redis
 import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app, auth
+from firebase_admin import credentials, firestore, db, initialize_app, auth
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-
 from groq import Groq
 import PyPDF2
 import docx
 import io
-
 import requests
 
 
@@ -31,8 +29,10 @@ security = HTTPBearer()
 
 # Initialize Firebase
 cred = credentials.Certificate("serviceAccountKey.json")
-initialize_app(cred)
-db = firestore.client()
+firebase_admin.initialize_app(cred, {
+    'databaseURL': os.getenv('FIREBASE_DATABASE_URL')
+})
+firestore_db  = firestore.client()
 
 # Firebase Web API Key
 FIREBASE_WEB_API_KEY = os.getenv('FIREBASE_WEB_API_KEY')
@@ -151,7 +151,7 @@ def send_otp_email(recipient_email: str, otp: str) -> bool:
 def check_email_exists(email: str) -> bool:
     """Check if email exists in Firestore admins collection"""
     try:
-        admins_ref = db.collection('admins')
+        admins_ref = firestore_db .collection('admins')
         query = admins_ref.where('email', '==', email).limit(1).get()
         return len(query) > 0
     except Exception as e:
@@ -457,7 +457,7 @@ async def sign_up(
             )
         
         # Check if admin already exists
-        admins_ref = db.collection('admins')
+        admins_ref = firestore_db .collection('admins')
         existing_admin = admins_ref.where('email', '==', email).limit(1).get()
         if len(existing_admin) > 0:
             raise HTTPException(
@@ -469,7 +469,7 @@ async def sign_up(
         processed_content = await process_files_with_groq(files)
         
         # Create document in sops_manuals collection
-        sops_ref = db.collection('sops_manuals')
+        sops_ref = firestore_db .collection('sops_manuals')
         sop_doc_ref = sops_ref.add({
             'sop_manual_guidelines': processed_content,
         })
@@ -599,7 +599,7 @@ async def login(request: LoginRequest):
         firebase_uid = firebase_response.get('localId')
         
         # Verify user exists in admins collection
-        admins_ref = db.collection('admins')
+        admins_ref = firestore_db .collection('admins')
         admin_query = admins_ref.where('email', '==', email).limit(1).get()
         
         if len(admin_query) == 0:
@@ -643,7 +643,144 @@ async def login(request: LoginRequest):
         )
 
 
+#------------------------------------------------------------------------------------------
+#          5. GET /get-active-calls endpoint
+#------------------------------------------------------------------------------------------
 
+
+class ActiveCall(BaseModel):
+    call_id: str
+    worker_id: str
+    mobile_no: str
+    conversation_id: str
+    urgency: str
+    status: str
+    timestamp: str
+    medium: str
+    last_message_at: str
+    admin_id: Optional[str] = None
+
+class GetActiveCallsResponse(BaseModel):
+    success: bool
+    active_calls: List[ActiveCall]
+
+def verify_access_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT access token and extract payload"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        
+        admin_id = payload.get("sub")
+        if not admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload"
+            )
+        
+        return {"admin_id": admin_id, "email": payload.get("email")}
+    
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+def get_admin_company(admin_id: str) -> str:
+    """Get company name for admin from Firestore"""
+    try:
+        admin_doc = firestore_db.collection('admins').document(admin_id).get()
+        if not admin_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Admin not found"
+            )
+        return admin_doc.to_dict().get('company_name')
+    except Exception as e:
+        print(f"Error fetching admin company: {str(e)}")
+        raise
+
+def convert_timestamp(timestamp_value) -> str:
+    """Convert Firebase timestamp to ISO format string"""
+    try:
+        if isinstance(timestamp_value, (int, float)):
+            return datetime.fromtimestamp(timestamp_value / 1000).isoformat() + "Z"
+        elif isinstance(timestamp_value, str):
+            return timestamp_value
+        else:
+            return datetime.utcnow().isoformat() + "Z"
+    except:
+        return datetime.utcnow().isoformat() + "Z"
+
+@app.get("/get-active-calls", response_model=GetActiveCallsResponse, status_code=status.HTTP_200_OK)
+async def get_active_calls(token_data: dict = Depends(verify_access_token)):
+    """
+    Get active calls for logged-in admin
+    
+    Returns active calls that are:
+    - Taken over by the logged-in admin (admin_id matches)
+    - Unassigned calls from workers in the same company
+    """
+    try:
+        admin_id = token_data["admin_id"]
+        
+        # Get admin's company name
+        company_name = get_admin_company(admin_id)
+        
+        # Get all workers under this admin's company
+        workers_ref = firestore_db.collection('workers')
+        workers_query = workers_ref.where('admin_id', '==', admin_id).get()
+        worker_ids = [worker.id for worker in workers_query]
+        
+        # Query Realtime Database for active calls
+        active_calls_ref = db.reference('active_calls')
+        all_calls = active_calls_ref.get()
+        
+        filtered_calls = []
+        
+        if all_calls:
+            for call_id, call_data in all_calls.items():
+                # Filter: admin_id matches OR admin_id is null/empty and worker belongs to admin's company
+                if (call_data.get('admin_id') == admin_id or 
+                    (not call_data.get('admin_id') and call_data.get('worker_id') in worker_ids)):
+                    
+                    active_call = ActiveCall(
+                        call_id=call_id,
+                        worker_id=call_data.get('worker_id', ''),
+                        mobile_no=call_data.get('mobile_no', ''),
+                        conversation_id=call_data.get('conversation_id', ''),
+                        urgency=call_data.get('urgency', 'NORMAL'),
+                        status=call_data.get('status', 'ACTIVE'),
+                        timestamp=convert_timestamp(call_data.get('timestamp')),
+                        medium=call_data.get('medium', 'Text'),
+                        last_message_at=convert_timestamp(call_data.get('last_message_at')),
+                        admin_id=call_data.get('admin_id')
+                    )
+                    filtered_calls.append(active_call)
+        
+        # Sort by urgency: CRITICAL > URGENT > NORMAL
+        urgency_priority = {'CRITICAL': 0, 'URGENT': 1, 'NORMAL': 2}
+        filtered_calls.sort(key=lambda x: urgency_priority.get(x.urgency, 3))
+        
+        return GetActiveCallsResponse(
+            success=True,
+            active_calls=filtered_calls
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_active_calls: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve active calls"
+        )
 
 
 if __name__ == "__main__":
