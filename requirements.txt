@@ -1,0 +1,17 @@
+# requirements.txt
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+httpx==0.27.2
+pydantic==2.9.2
+python-dotenv==1.0.1
+fastapi
+firebase-admin
+pydantic
+pydantic[email]
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+groq
+PyPDF2
+python-docx
+redis==5.0.1
