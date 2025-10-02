@@ -16,6 +16,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from groq import Groq
 import PyPDF2
+import pdfplumber
 import docx
 import io
 import requests
@@ -341,13 +342,15 @@ def verify_temp_token(token: str) -> str:
         )
 
 def extract_text_from_pdf(file_content: bytes) -> str:
-    """Extract text from PDF file"""
+    """Extract text from PDF file using pdfplumber"""
     try:
         pdf_file = io.BytesIO(file_content)
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
         text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+        with pdfplumber.open(pdf_file) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:  # Write text only if extraction is successful
+                    text += page_text + "\n--- Page Break ---\n"  # Separates pages
         return text
     except Exception as e:
         print(f"Error extracting PDF: {str(e)}")
@@ -393,30 +396,29 @@ async def process_files_with_groq(files: List[UploadFile]) -> str:
         
         all_text += f"\n--- {file.filename} ---\n{extracted_text}\n"
     
-    # Use Groq to process and structure the extracted text
-    try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert at analyzing SOP manuals and documentation. Extract and organize key information, procedures, and guidelines from the provided text. Structure the content clearly and maintain important details."
-                },
-                {
-                    "role": "user",
-                    "content": f"Process and structure the following SOP manual content:\n\n{all_text}"
-                }
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.3,
-            max_tokens=8000
-        )
-        
-        processed_content = chat_completion.choices[0].message.content
-        return processed_content
-    
-    except Exception as e:
-        print(f"Error processing with Groq: {str(e)}")
-        return all_text
+    # # Use Groq to process and structure the extracted text
+    # try:
+    #     chat_completion = groq_client.chat.completions.create(
+    #         messages=[
+    #             {
+    #                 "role": "system",
+    #                 "content": "You are an expert at analyzing SOP manuals and documentation. Extract and organize key information, procedures, and guidelines from the provided text. Structure the content clearly and maintain important details."
+    #             },
+    #             {
+    #                 "role": "user",
+    #                 "content": f"Process and structure the following SOP manual content:\n\n{all_text}"
+    #             }
+    #         ],
+    #         model="llama-3.3-70b-versatile",
+    #         temperature=0.3,
+    #         max_tokens=8000
+    #     )
+    #     processed_content = chat_completion.choices[0].message.content
+    #     return processed_content
+    # except Exception as e:
+    #     print(f"Error processing with Groq: {str(e)}")
+    #     return all_text
+    return all_text
 
 @app.post("/sign-up", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(
