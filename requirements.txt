@@ -9,3 +9,6 @@ python-dotenv
 twilio 
 flask
 pdfplumber
+fastapi
+uvicorn
+python-multipart

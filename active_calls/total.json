@@ -1,55 +1,91 @@
 {
   "active_calls": {
-    "call_918766053997_20251003_002914": {
+    "call_918766053997_20251003_015803": {
       "worker_id": "worker_918766053997",
       "mobile_no": "+918766053997",
-      "conversation_id": "conv_918766053997_20251003_002914",
-      "urgency": "URGENT",
+      "conversation_id": "conv_918766053997_20251003_015803",
+      "urgency": "CRITICAL",
       "status": "ACTIVE",
-      "timestamp": "2025-10-03T00:29:14+05:30",
+      "timestamp": "2025-10-03T01:58:03+05:30",
       "medium": "Voice",
-      "last_message_at": "2025-10-03T00:29:56+05:30"
+      "last_message_at": "2025-10-03T01:59:56+05:30"
     }
   },
   "active_conversations": {
-    "conv_918766053997_20251003_002914": {
-      "call_id": "call_918766053997_20251003_002914",
+    "conv_918766053997_20251003_015803": {
+      "call_id": "call_918766053997_20251003_015803",
       "messages": {
-        "msg_918766053997_20251003_002914_0001": {
+        "msg_918766053997_20251003_015803_0001": {
           "role": "user",
-          "content": "There is fire in zone. A, where is the fire extinguisher?",
-          "timestamp": "2025-10-03T00:29:14+05:30",
+          "content": "What is the organization name?",
+          "timestamp": "2025-10-03T01:58:03+05:30",
           "sources": ""
         },
-        "msg_918766053997_20251003_002914_0002": {
+        "msg_918766053997_20251003_015803_0002": {
           "role": "assistant",
-          "content": "Activate fire alarm. Fire extinguisher is near press machine 3 in Zone A. Use Class B extinguisher if safe.",
-          "timestamp": "2025-10-03T00:29:14+05:30",
-          "sources": "Fire Safety Protocol, Zone A Layout, Equipment Manual"
+          "content": "The organization name is not explicitly stated in the provided text.",
+          "timestamp": "2025-10-03T01:58:03+05:30",
+          "sources": "Company Documentation, Introduction to the Company"
         },
-        "msg_918766053997_20251003_002914_0003": {
+        "msg_918766053997_20251003_015803_0003": {
           "role": "user",
-          "content": "Tell me more about manual.",
-          "timestamp": "2025-10-03T00:29:31+05:30",
+          "content": "Can you give me some organizational info?",
+          "timestamp": "2025-10-03T01:58:21+05:30",
           "sources": ""
         },
-        "msg_918766053997_20251003_002914_0004": {
+        "msg_918766053997_20251003_015803_0004": {
           "role": "assistant",
-          "content": "You're referring to the Emergency Procedures Manual. It's a guide that outlines steps to take in case of emergencies like fires, gas leaks, and injuries. You can find it on the wall near the maintenance workshop in Zone E. Does this help? Any questions?",
-          "timestamp": "2025-10-03T00:29:31+05:30",
-          "sources": ""
+          "content": "The company was founded in 1990 by John Doe and Jane Smith. It has achieved numerous milestones, including launching its first product in 1995, expanding internationally in 2000, and receiving several industry awards. The company's mission is to provide top-notch services while maintaining a safe and productive work environment. Its core values include integrity, respect, and continuous improvement.",
+          "timestamp": "2025-10-03T01:58:21+05:30",
+          "sources": "Company History, Mission Statement, Core Values"
         },
-        "msg_918766053997_20251003_002914_0005": {
+        "msg_918766053997_20251003_015803_0005": {
           "role": "user",
-          "content": "1 guy has fallen down.",
-          "timestamp": "2025-10-03T00:29:56+05:30",
+          "content": "What to do, if a employee Falls.",
+          "timestamp": "2025-10-03T01:59:00+05:30",
           "sources": ""
         },
-        "msg_918766053997_20251003_002914_0006": {
+        "msg_918766053997_20251003_015803_0006": {
           "role": "assistant",
-          "content": "Call ambulance immediately. Provide first aid if safe. Do not move victim unless in danger.",
-          "timestamp": "2025-10-03T00:29:56+05:30",
-          "sources": "First Aid Guide, Emergency Procedures Manual"
+          "content": "If an employee falls, contact the on-site medical staff immediately. Provide first aid if trained to do so.",
+          "timestamp": "2025-10-03T01:59:00+05:30",
+          "sources": "Medical Emergency Procedure, First Aid Kit Locations"
+        },
+        "msg_918766053997_20251003_015803_0007": {
+          "role": "user",
+          "content": "Where is first aid kit located?",
+          "timestamp": "2025-10-03T01:59:17+05:30",
+          "sources": ""
+        },
+        "msg_918766053997_20251003_015803_0008": {
+          "role": "assistant",
+          "content": "First aid kits are available at designated locations throughout the office.",
+          "timestamp": "2025-10-03T01:59:17+05:30",
+          "sources": "Emergency Procedures Manual, Medical Emergency Protocol"
+        },
+        "msg_918766053997_20251003_015803_0009": {
+          "role": "user",
+          "content": "Help 1 person is about to die.",
+          "timestamp": "2025-10-03T01:59:35+05:30",
+          "sources": ""
+        },
+        "msg_918766053997_20251003_015803_0010": {
+          "role": "assistant",
+          "content": "Call emergency services now. Contact on-site medical staff immediately. Start CPR if trained to do so. Did you understand? Say yes or no.",
+          "timestamp": "2025-10-03T01:59:35+05:30",
+          "sources": "Emergency Procedures Manual, Medical Emergency Protocol"
+        },
+        "msg_918766053997_20251003_015803_0011": {
+          "role": "user",
+          "content": "No.",
+          "timestamp": "2025-10-03T01:59:56+05:30",
+          "sources": ""
+        },
+        "msg_918766053997_20251003_015803_0012": {
+          "role": "assistant",
+          "content": "Call 911 or your local emergency number. Tell them someone is seriously injured and needs help right away. Did you understand? Say yes or no.",
+          "timestamp": "2025-10-03T01:59:56+05:30",
+          "sources": "Emergency Procedures Manual, Medical Emergency Protocol"
         }
       }
     }
