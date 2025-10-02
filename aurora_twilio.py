@@ -124,7 +124,7 @@ class ActiveCallsManager:
         """Generate message ID"""
         return f"msg_{conv_id.split('_', 1)[1]}_{message_count:04d}"
     
-    def add_conversation_entry(self, phone_number, user_query, aurora_response, urgency_level, call_sid=None):
+    def add_conversation_entry(self, phone_number, user_query, aurora_response, urgency_level, sources=None, call_sid=None):
         """Add a new conversation entry following frontend structure"""
         try:
             data = self._load_data()
@@ -172,15 +172,17 @@ class ActiveCallsManager:
             conv_data["messages"][user_msg_id] = {
                 "role": "user",
                 "content": user_query,
-                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
+                "sources": ""
             }
             
-            # Add assistant message
+            # Add assistant message with sources
             assistant_msg_id = self._generate_msg_id(conv_id, message_count + 2)
             conv_data["messages"][assistant_msg_id] = {
                 "role": "assistant",
                 "content": aurora_response,
-                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
+                "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
+                "sources": sources or ""
             }
             
             # Update call urgency and last message time
@@ -389,20 +391,16 @@ PHONE-SPECIFIC RULES:
 Remember: This is a PHONE CALL. Keep it SHORT and CLEAR."""
     
     def generate_response(self, conversation_history, user_input):
-        """Generate Aurora's response"""
-        
-        # Build messages with system prompt
-        messages = [{"role": "system", "content": self.system_prompt}]
-        messages.extend(conversation_history)
-        messages.append({"role": "user", "content": user_input})
+        """Generate Aurora's response with sources extraction"""
         
         try:
-            # Enhanced system prompt to include urgency classification
+            # Enhanced system prompt to include urgency classification and sources
             enhanced_system_prompt = self.system_prompt + """
 
-IMPORTANT: After providing your response, you MUST also classify the urgency level.
+IMPORTANT: After providing your response, you MUST also classify the urgency level and provide sources.
 Add this exact format at the end of your response:
 [URGENCY: critical/urgent/normal/assistive]
+[SOURCES: source1, source2, source3]
 
 Urgency levels:
 - "critical": life-threatening, immediate danger (gas leaks, fires, explosions, severe injuries)
@@ -410,8 +408,11 @@ Urgency levels:
 - "normal": routine work situation (status updates, general questions)
 - "assistive": asking for help, guidance, or procedures (how-to questions, troubleshooting)
 
+Sources should be relevant references like:
+- "OSHA Safety Standards", "Emergency Procedures Manual", "Zone A Layout", "Valve 3 Documentation", "Fire Safety Protocol", "Chemical Handling Guide", "Equipment Manual", "Safety Training Materials"
+
 Example response:
-"Evacuate immediately. Shut Valve 3 if safe. Call fire brigade now. [URGENCY: critical]"
+"Evacuate immediately. Shut Valve 3 if safe. Call fire brigade now. [URGENCY: critical] [SOURCES: Emergency Procedures Manual, Zone A Layout, Fire Safety Protocol]"
 """
             
             # Build messages with enhanced system prompt
@@ -423,14 +424,17 @@ Example response:
             response = self.client.chat.completions.create(
                 model=self.config.CEREBRAS_MODEL,
                 messages=enhanced_messages,
-                max_tokens=200,  # Increased to accommodate urgency classification
+                max_tokens=250,  # Increased to accommodate urgency and sources
                 temperature=0.2,  # Very low for consistent safety instructions
             )
             
             full_response = response.choices[0].message.content
             
-            # Extract urgency level from response
+            # Extract urgency level and sources from response
             urgency_level = "normal"  # Default
+            sources = []  # Default empty sources
+            
+            # Extract urgency
             if "[URGENCY:" in full_response:
                 try:
                     urgency_start = full_response.find("[URGENCY:") + 9
@@ -441,21 +445,32 @@ Example response:
                     valid_levels = ["critical", "urgent", "normal", "assistive"]
                     if urgency_level not in valid_levels:
                         urgency_level = "normal"
-                        
-                    # Remove urgency classification from response
-                    assistant_message = full_response[:full_response.find("[URGENCY:")].strip()
                 except Exception as e:
                     print(f"❌ Urgency parsing error: {e}")
-                    assistant_message = full_response
                     urgency_level = "normal"
-            else:
-                assistant_message = full_response
             
-            return assistant_message, urgency_level
+            # Extract sources
+            if "[SOURCES:" in full_response:
+                try:
+                    sources_start = full_response.find("[SOURCES:") + 9
+                    sources_end = full_response.find("]", sources_start)
+                    sources = full_response[sources_start:sources_end].strip()
+                except Exception as e:
+                    print(f"❌ Sources parsing error: {e}")
+                    sources = ""
+            
+            # Remove both classifications from response
+            assistant_message = full_response
+            if "[URGENCY:" in assistant_message:
+                assistant_message = assistant_message[:assistant_message.find("[URGENCY:")].strip()
+            if "[SOURCES:" in assistant_message:
+                assistant_message = assistant_message[:assistant_message.find("[SOURCES:")].strip()
+            
+            return assistant_message, urgency_level, sources
             
         except Exception as e:
             print(f"❌ LLM Error: {e}")
-            return "Emergency system error. Please call your supervisor at extension 9999 immediately.", "critical"
+            return "Emergency system error. Please call your supervisor at extension 9999 immediately.", "critical", "Emergency Procedures Manual"
 
 # ============================================================================
 # FLASK APP
@@ -611,7 +626,7 @@ def process_speech():
         
         # Generate Aurora's response
         conversation_history = conversation_manager.get_history(call_sid)
-        aurora_response, urgency_level = aurora_llm.generate_response(conversation_history, speech_result)
+        aurora_response, urgency_level, sources = aurora_llm.generate_response(conversation_history, speech_result)
         
         # Add Aurora's response to history
         conversation_manager.add_message(call_sid, "assistant", aurora_response)
@@ -621,12 +636,14 @@ def process_speech():
             conversation_manager.add_critical_alert(call_sid, {
                 "worker_message": speech_result,
                 "aurora_response": aurora_response,
-                "urgency_level": urgency_level
+                "urgency_level": urgency_level,
+                "sources": sources
             })
             print(f"   ⚠️ {urgency_level.upper()} SITUATION DETECTED")
         
         print(f"   🤖 Aurora: {aurora_response}")
         print(f"   📊 Urgency Level: {urgency_level}")
+        print(f"   📚 Sources: {sources}")
         
         # Save to active calls structure
         phone_number = request.form.get('From', 'Unknown')
@@ -635,6 +652,7 @@ def process_speech():
             user_query=speech_result,
             aurora_response=aurora_response,
             urgency_level=urgency_level,
+            sources=sources,
             call_sid=call_sid
         )
         
@@ -694,17 +712,19 @@ def api_process_speech():
             })
         
         # Generate Aurora's response
-        aurora_response, urgency_level = aurora_llm.generate_response([], speech_result)
+        aurora_response, urgency_level, sources = aurora_llm.generate_response([], speech_result)
         
         print(f"   🤖 Aurora: {aurora_response}")
         print(f"   📊 Urgency Level: {urgency_level}")
+        print(f"   📚 Sources: {sources}")
         
         # Save to active calls structure
         call_id, conv_id = active_calls_manager.add_conversation_entry(
             phone_number=phone_number,
             user_query=speech_result,
             aurora_response=aurora_response,
-            urgency_level=urgency_level
+            urgency_level=urgency_level,
+            sources=sources
         )
         
         # Prepare JSON response
