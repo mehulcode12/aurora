@@ -59,8 +59,10 @@ SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 redis_client = redis.Redis(
     host=os.getenv('REDIS_HOST', 'localhost'),
     port=int(os.getenv('REDIS_PORT', 6379)),
+    decode_responses=True,
+    username=os.getenv('REDIS_USERNAME'),
+    password=os.getenv('REDIS_PASSWORD'),
     db=0,
-    decode_responses=True
 )
 
 # Test Redis connection
