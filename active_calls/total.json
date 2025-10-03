@@ -1,0 +1,201 @@
+{
+  "active_calls": {
+    "call_919325590143_20251003_115804": {
+      "worker_id": "worker_919325590143",
+      "mobile_no": "+919325590143",
+      "conversation_id": "conv_919325590143_20251003_115804",
+      "urgency": "CRITICAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T11:58:04+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T12:03:27+05:30"
+    }
+  },
+  "active_conversations": {
+    "conv_919325590143_20251003_115804": {
+      "call_id": "call_919325590143_20251003_115804",
+      "messages": {
+        "msg_919325590143_20251003_115804_0001": {
+          "role": "user",
+          "content": "My friend is falling from a floor, what should I do?",
+          "timestamp": "2025-10-03T11:58:04+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0002": {
+          "role": "assistant",
+          "content": "Call for help now. Try to break their fall if safe. Clear the area. \nDid you understand? Say yes or no.",
+          "timestamp": "2025-10-03T11:58:04+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards"
+        },
+        "msg_919325590143_20251003_115804_0003": {
+          "role": "user",
+          "content": "No, please leave more clear.",
+          "timestamp": "2025-10-03T11:58:18+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0004": {
+          "role": "assistant",
+          "content": "Call emergency services immediately. \nTry to break their fall with a safety mat if available. \nDo not attempt to catch them yourself. \nDid you understand? Say yes or no.",
+          "timestamp": "2025-10-03T11:58:18+05:30",
+          "sources": "OSHA Safety Standards, Emergency Procedures Manual"
+        },
+        "msg_919325590143_20251003_115804_0005": {
+          "role": "user",
+          "content": "Yes.",
+          "timestamp": "2025-10-03T11:58:45+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0006": {
+          "role": "assistant",
+          "content": "Make sure they receive medical attention right away. \nStay with them until help arrives. \nDid you understand? Say yes or no.",
+          "timestamp": "2025-10-03T11:58:45+05:30",
+          "sources": "OSHA Safety Standards, Emergency Procedures Manual"
+        },
+        "msg_919325590143_20251003_115804_0007": {
+          "role": "user",
+          "content": "Yes, yes. Yes. I understand.",
+          "timestamp": "2025-10-03T11:58:57+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0008": {
+          "role": "assistant",
+          "content": "Help is on the way. Stay safe.",
+          "timestamp": "2025-10-03T11:58:57+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, First Aid Guide"
+        },
+        "msg_919325590143_20251003_115804_0009": {
+          "role": "user",
+          "content": "Okay, thank you.",
+          "timestamp": "2025-10-03T11:59:06+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0010": {
+          "role": "assistant",
+          "content": "You're welcome. Take care of your friend.",
+          "timestamp": "2025-10-03T11:59:06+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, First Aid Guide"
+        },
+        "msg_919325590143_20251003_115804_0011": {
+          "role": "user",
+          "content": "What should I do?",
+          "timestamp": "2025-10-03T12:01:35+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0012": {
+          "role": "assistant",
+          "content": "Tell me what's happening. What's your situation? \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:01:35+05:30",
+          "sources": "none"
+        },
+        "msg_919325590143_20251003_115804_0013": {
+          "role": "user",
+          "content": "2 days of pain in my chest. What should I do?",
+          "timestamp": "2025-10-03T12:01:47+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0014": {
+          "role": "assistant",
+          "content": "Call emergency services now. \nFollow their instructions. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:01:47+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0015": {
+          "role": "user",
+          "content": "No, I don't understand.",
+          "timestamp": "2025-10-03T12:02:02+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0016": {
+          "role": "assistant",
+          "content": "Chest pain can be serious. \nGo to the hospital or call emergency services. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:02:02+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0017": {
+          "role": "user",
+          "content": "Yes, I Work It.",
+          "timestamp": "2025-10-03T12:02:13+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0018": {
+          "role": "assistant",
+          "content": "You need medical help. \nLeave work and go to the hospital now. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:02:13+05:30",
+          "sources": "OSHA Safety Standards, Emergency Procedures Manual"
+        },
+        "msg_919325590143_20251003_115804_0019": {
+          "role": "user",
+          "content": "Yes, yes.",
+          "timestamp": "2025-10-03T12:02:26+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0020": {
+          "role": "assistant",
+          "content": "Someone should go with you. \nTell your supervisor you're leaving. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:02:26+05:30",
+          "sources": "OSHA Safety Standards, Emergency Procedures Manual"
+        },
+        "msg_919325590143_20251003_115804_0021": {
+          "role": "user",
+          "content": "Yes, yes, I got it.",
+          "timestamp": "2025-10-03T12:02:41+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0022": {
+          "role": "assistant",
+          "content": "Be careful and get help. \nCall me if you need anything else. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:02:41+05:30",
+          "sources": "OSHA Safety Standards, Emergency Procedures Manual, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0023": {
+          "role": "user",
+          "content": "Yes, I got it.",
+          "timestamp": "2025-10-03T12:02:54+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0024": {
+          "role": "assistant",
+          "content": "Go now and get medical help. \nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T12:02:54+05:30",
+          "sources": "OSHA Medical Emergency Protocol, Emergency Procedures Manual"
+        },
+        "msg_919325590143_20251003_115804_0025": {
+          "role": "user",
+          "content": "Yes. Yes, I got it. Got it. Yes.",
+          "timestamp": "2025-10-03T12:03:06+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0026": {
+          "role": "assistant",
+          "content": "You confirmed. \nGo to the hospital now.",
+          "timestamp": "2025-10-03T12:03:06+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0027": {
+          "role": "user",
+          "content": "Okay, okay.",
+          "timestamp": "2025-10-03T12:03:18+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0028": {
+          "role": "assistant",
+          "content": "Go now.",
+          "timestamp": "2025-10-03T12:03:18+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0029": {
+          "role": "user",
+          "content": "Okay, okay.",
+          "timestamp": "2025-10-03T12:03:27+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0030": {
+          "role": "assistant",
+          "content": "",
+          "timestamp": "2025-10-03T12:03:27+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        }
+      }
+    }
+  }
+}

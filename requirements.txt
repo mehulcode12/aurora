@@ -27,4 +27,4 @@ TTS
 # edge-tts
 cerebras_cloud_sdk 
 huggingface_hub[hf_xet]
-twilio 
+twilio

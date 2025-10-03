@@ -82,8 +82,8 @@ class Config:
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     
     # Voice settings
-    TTS_VOICE = "Polly.Matthew"
-    SPEECH_RATE = "slow"
+    TTS_VOICE = "Polly.Amy"
+    SPEECH_RATE = "fast"
     
     # Conversation settings
     SPEECH_TIMEOUT = "auto"
