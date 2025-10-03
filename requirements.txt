@@ -17,3 +17,14 @@ pdfplumber
 python-docx
 redis==5.0.1
 requests==2.31.0
+
+
+sounddevice 
+numpy 
+webrtcvad 
+faster-whisper 
+TTS
+# edge-tts
+cerebras_cloud_sdk 
+huggingface_hub[hf_xet]
+twilio 
