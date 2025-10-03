@@ -481,6 +481,26 @@ active_calls_manager = ActiveCallsManager()
 # ENDPOINTS
 # ============================================================================
 
+@app.get("/status")
+async def status():
+    """Health check and status endpoint"""
+    return {
+        "status": "online",
+        "message": "Aurora Emergency Assistant is running",
+        "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
+        "version": "2.0.0",
+        "services": {
+            "aurora_llm": "active" if config.CEREBRAS_API_KEY else "inactive",
+            "twilio": "active" if config.TWILIO_ACCOUNT_SID else "inactive",
+            "web_call": "active"
+        }
+    }
+
+@app.get("/hello")
+async def hello():
+    """Simple hello endpoint"""
+    return {"message": "Hello! Aurora Emergency Assistant is ready to help."}
+
 @app.get("/", response_class=HTMLResponse)
 async def home():
     """Health check endpoint and status page"""
@@ -489,6 +509,8 @@ async def home():
     <p>Status: <strong>Online</strong></p>
     <p>Endpoints:</p>
     <ul>
+        <li>GET /status - Health check and system status</li>
+        <li>GET /hello - Simple hello message</li>
         <li>POST /incoming-call - Handle incoming calls (returns TwiML)</li>
         <li>POST /process-speech - Process worker speech (returns TwiML)</li>
         <li>POST /call-status - Call status updates</li>
