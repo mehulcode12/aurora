@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora - Live Conversation Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff3838;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-bar {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-connected {
+            background: #2ecc71;
+        }
+
+        .status-disconnected {
+            background: #95a5a6;
+        }
+
+        .status-error {
+            background: #e74c3c;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .conversation-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .conversation-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+        }
+
+        .conversation-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 3px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .urgency-critical {
+            color: #ff4757;
+            font-weight: bold;
+        }
+
+        .urgency-urgent {
+            color: #ffa502;
+            font-weight: bold;
+        }
+
+        .messages-container {
+            padding: 25px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .message-icon {
+            font-size: 24px;
+        }
+
+        .message-role {
+            font-weight: 600;
+            color: #333;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .message-time {
+            color: #999;
+            font-size: 11px;
+            margin-left: auto;
+        }
+
+        .message-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-left: 34px;
+            line-height: 1.6;
+        }
+
+        .message-sources {
+            margin-left: 34px;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .new-message-badge {
+            background: #ff4757;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+            animation: bounce 0.5s;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Aurora Emergency Assistant</h1>
+            <p class="subtitle">Live Conversation Monitor - Real-time streaming with Server-Sent Events</p>
+        </div>
+
+        <div class="controls">
+            <div class="form-group">
+                <label for="authToken">Authentication Token (JWT)</label>
+                <input type="text" id="authToken" placeholder="Enter your JWT token">
+            </div>
+            <div class="form-group">
+                <label for="conversationId">Conversation ID</label>
+                <input type="text" id="conversationId" placeholder="e.g., conv_919325590143_20251003_115804" value="conv_919325590143_20251003_115804">
+            </div>
+            <div class="button-group">
+                <button id="snapshotBtn" class="btn-secondary" onclick="getSnapshot()">📸 Get Snapshot</button>
+                <button id="streamBtn" class="btn-primary" onclick="startStream()">▶️ Start Streaming</button>
+                <button id="stopBtn" class="btn-danger" onclick="stopStream()" disabled>⏹️ Stop Stream</button>
+            </div>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+            <div class="status-indicator status-disconnected" id="statusIndicator"></div>
+            <div id="statusText">Disconnected - Enter credentials and click Start Streaming</div>
+        </div>
+
+        <div class="conversation-container">
+            <div class="conversation-header">
+                <h2>💬 Live Conversation</h2>
+                <div class="conversation-info" id="conversationInfo" style="display: none;">
+                    <div class="info-item">
+                        <div class="info-label">Call ID</div>
+                        <div class="info-value" id="infoCallId">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Worker ID</div>
+                        <div class="info-value" id="infoWorkerId">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Mobile</div>
+                        <div class="info-value" id="infoMobile">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Urgency</div>
+                        <div class="info-value" id="infoUrgency">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value" id="infoStatus">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Medium</div>
+                        <div class="info-value" id="infoMedium">-</div>
+                    </div>
+                </div>
+            </div>
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">💬</div>
+                    <p>No conversation loaded</p>
+                    <p style="font-size: 12px; margin-top: 10px;">Enter your credentials and click "Start Streaming"</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let messageCount = 0;
+
+        function updateStatus(status, text) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            indicator.className = 'status-indicator status-' + status;
+            statusText.textContent = text;
+        }
+
+        function updateConversationInfo(data) {
+            document.getElementById('conversationInfo').style.display = 'grid';
+            document.getElementById('infoCallId').textContent = data.call_id || '-';
+            document.getElementById('infoWorkerId').textContent = data.worker_id || '-';
+            document.getElementById('infoMobile').textContent = data.mobile_no || '-';
+            
+            const urgencyEl = document.getElementById('infoUrgency');
+            urgencyEl.textContent = data.urgency || '-';
+            urgencyEl.className = 'info-value urgency-' + (data.urgency || '').toLowerCase();
+            
+            document.getElementById('infoStatus').textContent = data.status || '-';
+            document.getElementById('infoMedium').textContent = data.medium || '-';
+        }
+
+        function displayMessages(messages, isNew = false) {
+            const container = document.getElementById('messagesContainer');
+            
+            if (messageCount === 0) {
+                container.innerHTML = '';
+            }
+
+            messages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                
+                const icon = msg.role === 'user' ? '👤' : '🤖';
+                const newBadge = isNew ? '<span class="new-message-badge">NEW</span>' : '';
+                
+                messageDiv.innerHTML = `
+                    <div class="message-header">
+                        <span class="message-icon">${icon}</span>
+                        <span class="message-role">${msg.role}</span>
+                        ${newBadge}
+                        <span class="message-time">${msg.timestamp}</span>
+                    </div>
+                    <div class="message-content">${msg.content}</div>
+                    ${msg.sources ? `<div class="message-sources">📚 Sources: ${msg.sources}</div>` : ''}
+                `;
+                
+                container.appendChild(messageDiv);
+                messageCount++;
+            });
+
+            // Auto-scroll to bottom
+            container.scrollTop = container.scrollHeight;
+
+            // Remove NEW badges after 3 seconds
+            if (isNew) {
+                setTimeout(() => {
+                    document.querySelectorAll('.new-message-badge').forEach(badge => {
+                        badge.style.opacity = '0';
+                        setTimeout(() => badge.remove(), 300);
+                    });
+                }, 3000);
+            }
+        }
+
+        function showError(message) {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = `
+                <div class="error-message">
+                    <strong>❌ Error:</strong> ${message}
+                </div>
+            `;
+        }
+
+        async function getSnapshot() {
+            const token = document.getElementById('authToken').value.trim();
+            const conversationId = document.getElementById('conversationId').value.trim();
+
+            if (!token || !conversationId) {
+                alert('Please enter both token and conversation ID');
+                return;
+            }
+
+            updateStatus('disconnected', 'Fetching snapshot...');
+
+            try {
+                const response = await fetch(`/api/conversation/${conversationId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateConversationInfo(data.conversation);
+                    messageCount = 0;
+                    displayMessages(data.conversation.messages);
+                    updateStatus('disconnected', `Snapshot loaded - ${data.conversation.total_messages} messages`);
+                } else {
+                    throw new Error('Failed to fetch snapshot');
+                }
+            } catch (error) {
+                updateStatus('error', 'Error: ' + error.message);
+                showError(error.message);
+            }
+        }
+
+        function startStream() {
+            const token = document.getElementById('authToken').value.trim();
+            const conversationId = document.getElementById('conversationId').value.trim();
+
+            if (!token || !conversationId) {
+                alert('Please enter both token and conversation ID');
+                return;
+            }
+
+            if (eventSource) {
+                stopStream();
+            }
+
+            updateStatus('disconnected', 'Connecting to stream...');
+            messageCount = 0;
+
+            // Note: EventSource doesn't support custom headers directly
+            // For production, use a library like @microsoft/fetch-event-source or pass token as query param
+            eventSource = new EventSource(`/api/conversation/${conversationId}/stream`);
+
+            eventSource.addEventListener('initial', (event) => {
+                const data = JSON.parse(event.data);
+                updateConversationInfo(data);
+                displayMessages(data.messages);
+                updateStatus('connected', `Connected - Monitoring conversation (${data.total_messages} messages)`);
+                
+                document.getElementById('streamBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+            });
+
+            eventSource.addEventListener('new_messages', (event) => {
+                const data = JSON.parse(event.data);
+                displayMessages(data.messages, true);
+                updateStatus('connected', `Connected - ${data.total_messages} total messages`);
+            });
+
+            eventSource.addEventListener('heartbeat', (event) => {
+                console.log('💓 Heartbeat received');
+            });
+
+            eventSource.addEventListener('ended', (event) => {
+                const data = JSON.parse(event.data);
+                updateStatus('disconnected', 'Conversation ended: ' + data.message);
+                stopStream();
+            });
+
+            eventSource.addEventListener('error', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateStatus('error', 'Error: ' + data.error);
+                    showError(data.error);
+                } catch {
+                    updateStatus('error', 'Connection error occurred');
+                }
+                stopStream();
+            });
+
+            eventSource.onerror = (error) => {
+                console.error('EventSource error:', error);
+                updateStatus('error', 'Connection lost');
+                stopStream();
+            };
+        }
+
+        function stopStream() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            updateStatus('disconnected', 'Stream stopped');
+            document.getElementById('streamBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        // Auto-save token to localStorage
+        document.getElementById('authToken').addEventListener('input', (e) => {
+            localStorage.setItem('aurora_auth_token', e.target.value);
+        });
+
+        // Auto-load token from localStorage
+        window.addEventListener('load', () => {
+            const savedToken = localStorage.getItem('aurora_auth_token');
+            if (savedToken) {
+                document.getElementById('authToken').value = savedToken;
+            }
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopStream();
+        });
+    </script>
+</body>
+</html>

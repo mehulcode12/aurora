@@ -14,8 +14,9 @@ Setup Instructions:
 """
 
 from fastapi import FastAPI, Form, Request, HTTPException, status, Depends, File, UploadFile, Header
-from fastapi.responses import Response, JSONResponse, HTMLResponse
+from fastapi.responses import Response, JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sse_starlette.sse import EventSourceResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.rest import Client
 from cerebras.cloud.sdk import Cerebras
@@ -30,6 +31,8 @@ import json
 import uuid
 import random
 import smtplib
+import asyncio
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import redis
@@ -601,6 +604,30 @@ class LogoutResponse(BaseModel):
     success: bool
     message: str
 
+class ConversationMessage(BaseModel):
+    message_id: str
+    role: str
+    content: str
+    timestamp: str
+    sources: Optional[str] = ""
+
+class ConversationSnapshot(BaseModel):
+    conversation_id: str
+    call_id: str
+    worker_id: str
+    mobile_no: str
+    urgency: str
+    status: str
+    medium: str
+    timestamp: str
+    messages: List[ConversationMessage]
+    total_messages: int
+    admin_id: Optional[str] = None
+
+class GetConversationResponse(BaseModel):
+    success: bool
+    conversation: ConversationSnapshot
+
 # ============================================================================
 # UTILITY FUNCTIONS - OTP & EMAIL
 # ============================================================================
@@ -954,12 +981,12 @@ async def home():
         <li>GET /redoc - Alternative API documentation (ReDoc)</li>
     </ul>
     
-    <p>Powered by Cerebras AI + Twilio + Firebase + Groq + FastAPI</p>
+    <p>Powered by Cerebras AI + Llama + Twilio + Firebase + FastAPI</p>
     <p><strong>🌐 Web Call Interface:</strong> <a href="/web-call" style="color: #007bff;">Try Aurora without a phone!</a></p>
     """
 
 @app.get("/status")
-async def status():
+async def get_status():
     """Health check and status endpoint"""
     return {
         "status": "online",
@@ -1834,6 +1861,314 @@ async def logout(token_data: dict = Depends(verify_access_token_with_blacklist))
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed. Please try again."
         )
+
+# ============================================================================
+# CONVERSATION ENDPOINTS
+# ============================================================================
+
+@app.get("/api/conversation/{conversation_id}", response_model=GetConversationResponse, status_code=status.HTTP_200_OK)
+async def get_conversation(
+    conversation_id: str,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Get a snapshot of a conversation with all messages
+    
+    This endpoint:
+    1. Verifies admin authentication
+    2. Checks if the admin has access to this conversation
+    3. Returns the complete conversation with all messages
+    
+    Args:
+        conversation_id: The ID of the conversation to retrieve
+        token_data: Authentication token data (injected by dependency)
+    
+    Returns:
+        GetConversationResponse: Complete conversation data
+    """
+    try:
+        admin_id = token_data["admin_id"]
+        
+        # Get admin's company and workers
+        company_name = get_admin_company(admin_id)
+        workers_ref = firestore_db.collection('workers')
+        workers_query = workers_ref.where('admin_id', '==', admin_id).get()
+        worker_ids = [worker.id for worker in workers_query]
+        
+        # Get conversation from Firebase Realtime Database
+        active_conversations_ref = db.reference(f'active_conversations/{conversation_id}')
+        conversation_data = active_conversations_ref.get()
+        
+        if not conversation_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation '{conversation_id}' not found"
+            )
+        
+        call_id = conversation_data.get('call_id')
+        
+        # Get call data to verify access
+        active_calls_ref = db.reference(f'active_calls/{call_id}')
+        call_data = active_calls_ref.get()
+        
+        if not call_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Call '{call_id}' not found or no longer active"
+            )
+        
+        # Check if admin has access
+        worker_id = call_data.get('worker_id')
+        call_admin_id = call_data.get('admin_id')
+        
+        has_access = (
+            call_admin_id == admin_id or 
+            (not call_admin_id and worker_id in worker_ids)
+        )
+        
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You don't have permission to view this conversation."
+            )
+        
+        # Build messages list
+        messages = conversation_data.get('messages', {})
+        message_list = []
+        
+        for msg_id, msg_data in sorted(messages.items()):
+            message_list.append(ConversationMessage(
+                message_id=msg_id,
+                role=msg_data.get('role', 'unknown'),
+                content=msg_data.get('content', ''),
+                timestamp=msg_data.get('timestamp', ''),
+                sources=msg_data.get('sources', '')
+            ))
+        
+        # Build conversation snapshot
+        conversation = ConversationSnapshot(
+            conversation_id=conversation_id,
+            call_id=call_id,
+            worker_id=worker_id,
+            mobile_no=call_data.get('mobile_no', ''),
+            urgency=call_data.get('urgency', 'NORMAL'),
+            status=call_data.get('status', 'ACTIVE'),
+            medium=call_data.get('medium', 'Text'),
+            timestamp=call_data.get('timestamp', ''),
+            messages=message_list,
+            total_messages=len(message_list),
+            admin_id=call_admin_id
+        )
+        
+        return GetConversationResponse(
+            success=True,
+            conversation=conversation
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_conversation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve conversation"
+        )
+
+@app.get("/api/conversation/{conversation_id}/stream")
+async def stream_conversation(
+    conversation_id: str,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Stream live conversation updates using Server-Sent Events (SSE)
+    
+    This endpoint:
+    1. Verifies admin authentication
+    2. Checks if the admin has access to this conversation
+    3. Returns initial conversation messages
+    4. Continuously monitors for new messages and streams them in real-time
+    
+    Args:
+        conversation_id: The ID of the conversation to stream
+        token_data: Authentication token data (injected by dependency)
+    
+    Returns:
+        EventSourceResponse: SSE stream of conversation messages
+    """
+    
+    async def event_generator():
+        """Generator function that yields conversation updates"""
+        try:
+            admin_id = token_data["admin_id"]
+            
+            # Get admin's company and workers
+            company_name = get_admin_company(admin_id)
+            workers_ref = firestore_db.collection('workers')
+            workers_query = workers_ref.where('admin_id', '==', admin_id).get()
+            worker_ids = [worker.id for worker in workers_query]
+            
+            # Verify the conversation exists and get call info
+            active_conversations_ref = db.reference(f'active_conversations/{conversation_id}')
+            conversation_data = active_conversations_ref.get()
+            
+            if not conversation_data:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({
+                        "error": "Conversation not found",
+                        "conversation_id": conversation_id
+                    })
+                }
+                return
+            
+            call_id = conversation_data.get('call_id')
+            
+            # Verify admin has access to this conversation
+            active_calls_ref = db.reference(f'active_calls/{call_id}')
+            call_data = active_calls_ref.get()
+            
+            if not call_data:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({
+                        "error": "Call not found or no longer active",
+                        "call_id": call_id
+                    })
+                }
+                return
+            
+            # Check if admin has access (either assigned to them or unassigned worker from their company)
+            worker_id = call_data.get('worker_id')
+            call_admin_id = call_data.get('admin_id')
+            
+            has_access = (
+                call_admin_id == admin_id or 
+                (not call_admin_id and worker_id in worker_ids)
+            )
+            
+            if not has_access:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({
+                        "error": "Access denied. You don't have permission to view this conversation.",
+                        "conversation_id": conversation_id
+                    })
+                }
+                return
+            
+            # Send initial conversation data
+            messages = conversation_data.get('messages', {})
+            initial_messages = []
+            
+            for msg_id, msg_data in sorted(messages.items()):
+                initial_messages.append({
+                    "message_id": msg_id,
+                    "role": msg_data.get('role'),
+                    "content": msg_data.get('content'),
+                    "timestamp": msg_data.get('timestamp'),
+                    "sources": msg_data.get('sources', '')
+                })
+            
+            # Send initial data event
+            yield {
+                "event": "initial",
+                "data": json.dumps({
+                    "conversation_id": conversation_id,
+                    "call_id": call_id,
+                    "worker_id": worker_id,
+                    "mobile_no": call_data.get('mobile_no'),
+                    "urgency": call_data.get('urgency'),
+                    "status": call_data.get('status'),
+                    "medium": call_data.get('medium'),
+                    "timestamp": call_data.get('timestamp'),
+                    "messages": initial_messages,
+                    "total_messages": len(initial_messages)
+                })
+            }
+            
+            # Track the last message count to detect new messages
+            last_message_count = len(messages)
+            
+            # Continuously monitor for new messages
+            while True:
+                await asyncio.sleep(1)  # Poll every second
+                
+                # Check if conversation still exists
+                conversation_data = active_conversations_ref.get()
+                if not conversation_data:
+                    yield {
+                        "event": "ended",
+                        "data": json.dumps({
+                            "message": "Conversation has ended",
+                            "conversation_id": conversation_id
+                        })
+                    }
+                    break
+                
+                # Check for new messages
+                current_messages = conversation_data.get('messages', {})
+                current_count = len(current_messages)
+                
+                if current_count > last_message_count:
+                    # New messages detected
+                    new_messages = []
+                    sorted_messages = sorted(current_messages.items())
+                    
+                    # Get only the new messages
+                    for msg_id, msg_data in sorted_messages[last_message_count:]:
+                        new_messages.append({
+                            "message_id": msg_id,
+                            "role": msg_data.get('role'),
+                            "content": msg_data.get('content'),
+                            "timestamp": msg_data.get('timestamp'),
+                            "sources": msg_data.get('sources', '')
+                        })
+                    
+                    # Send new messages event
+                    yield {
+                        "event": "new_messages",
+                        "data": json.dumps({
+                            "conversation_id": conversation_id,
+                            "messages": new_messages,
+                            "total_messages": current_count
+                        })
+                    }
+                    
+                    last_message_count = current_count
+                
+                # Check if call status has changed
+                call_data = active_calls_ref.get()
+                if not call_data:
+                    yield {
+                        "event": "ended",
+                        "data": json.dumps({
+                            "message": "Call has ended",
+                            "conversation_id": conversation_id
+                        })
+                    }
+                    break
+                
+                # Send heartbeat every 30 seconds to keep connection alive
+                if int(time.time()) % 30 == 0:
+                    yield {
+                        "event": "heartbeat",
+                        "data": json.dumps({
+                            "timestamp": datetime.now().isoformat(),
+                            "status": "connected"
+                        })
+                    }
+        
+        except Exception as e:
+            print(f"Error in conversation stream: {str(e)}")
+            yield {
+                "event": "error",
+                "data": json.dumps({
+                    "error": f"Stream error: {str(e)}",
+                    "conversation_id": conversation_id
+                })
+            }
+    
+    return EventSourceResponse(event_generator())
 
 # ============================================================================
 # STARTUP EVENT

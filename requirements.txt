@@ -4,6 +4,7 @@ uvicorn[standard]==0.30.6
 httpx==0.27.2
 pydantic==2.9.2
 python-dotenv==1.0.1
+sse-starlette==2.1.0
 fastapi
 firebase-admin
 pydantic
