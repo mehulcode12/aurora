@@ -12,3 +12,6 @@ pdfplumber
 fastapi
 uvicorn
 python-multipart
+# For web voice processing
+torch
+torchaudio

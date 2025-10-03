@@ -9,6 +9,156 @@
       "timestamp": "2025-10-03T01:58:03+05:30",
       "medium": "Voice",
       "last_message_at": "2025-10-03T02:57:46+05:30"
+    },
+    "call_web_user_1759511428247_20251003_224029": {
+      "worker_id": "worker_web_user_1759511428247",
+      "mobile_no": "web_user_1759511428247",
+      "conversation_id": "conv_web_user_1759511428247_20251003_224029",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T22:40:29+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T22:40:29+05:30"
+    },
+    "call_web_user_1759511776233_20251003_224618": {
+      "worker_id": "worker_web_user_1759511776233",
+      "mobile_no": "web_user_1759511776233",
+      "conversation_id": "conv_web_user_1759511776233_20251003_224618",
+      "urgency": "NORMAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T22:46:18+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T22:46:18+05:30"
+    },
+    "call_web_user_1759512230433_20251003_225351": {
+      "worker_id": "worker_web_user_1759512230433",
+      "mobile_no": "web_user_1759512230433",
+      "conversation_id": "conv_web_user_1759512230433_20251003_225351",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T22:53:51+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T22:53:51+05:30"
+    },
+    "call_web_user_1759512448477_20251003_225741": {
+      "worker_id": "worker_web_user_1759512448477",
+      "mobile_no": "web_user_1759512448477",
+      "conversation_id": "conv_web_user_1759512448477_20251003_225741",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T22:57:41+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T22:57:41+05:30"
+    },
+    "call_web_user_1759512750665_20251003_230239": {
+      "worker_id": "worker_web_user_1759512750665",
+      "mobile_no": "web_user_1759512750665",
+      "conversation_id": "conv_web_user_1759512750665_20251003_230239",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:02:39+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:02:39+05:30"
+    },
+    "call_web_user_1759512753143_20251003_230240": {
+      "worker_id": "worker_web_user_1759512753143",
+      "mobile_no": "web_user_1759512753143",
+      "conversation_id": "conv_web_user_1759512753143_20251003_230240",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:02:40+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:02:40+05:30"
+    },
+    "call_web_user_1759512781826_20251003_230307": {
+      "worker_id": "worker_web_user_1759512781826",
+      "mobile_no": "web_user_1759512781826",
+      "conversation_id": "conv_web_user_1759512781826_20251003_230307",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:03:07+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:03:07+05:30"
+    },
+    "call_web_user_1759512793325_20251003_230316": {
+      "worker_id": "worker_web_user_1759512793325",
+      "mobile_no": "web_user_1759512793325",
+      "conversation_id": "conv_web_user_1759512793325_20251003_230316",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:03:16+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:03:16+05:30"
+    },
+    "call_web_user_20251003_231242": {
+      "worker_id": "worker_web_user",
+      "mobile_no": "web_user",
+      "conversation_id": "conv_web_user_20251003_231242",
+      "urgency": "NORMAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:12:42+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:12:42+05:30"
+    },
+    "call_web_user_web_1759513837007_pemtdswht_20251003_232040": {
+      "worker_id": "worker_web_user_web_1759513837007_pemtdswht",
+      "mobile_no": "web_user_web_1759513837007_pemtdswht",
+      "conversation_id": "conv_web_user_web_1759513837007_pemtdswht_20251003_232040",
+      "urgency": "URGENT",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:20:40+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:21:54+05:30"
+    },
+    "call_web_user_web_1759513971946_0enad3pqz_20251003_232317": {
+      "worker_id": "worker_web_user_web_1759513971946_0enad3pqz",
+      "mobile_no": "web_user_web_1759513971946_0enad3pqz",
+      "conversation_id": "conv_web_user_web_1759513971946_0enad3pqz_20251003_232317",
+      "urgency": "NORMAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:23:17+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:23:17+05:30"
+    },
+    "call_web_user_web_1759514135904_zs8ks42qw_20251003_232554": {
+      "worker_id": "worker_web_user_web_1759514135904_zs8ks42qw",
+      "mobile_no": "web_user_web_1759514135904_zs8ks42qw",
+      "conversation_id": "conv_web_user_web_1759514135904_zs8ks42qw_20251003_232554",
+      "urgency": "URGENT",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:25:54+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:26:23+05:30"
+    },
+    "call_web_user_web_1759514198684_fskvg68h2_20251003_232653": {
+      "worker_id": "worker_web_user_web_1759514198684_fskvg68h2",
+      "mobile_no": "web_user_web_1759514198684_fskvg68h2",
+      "conversation_id": "conv_web_user_web_1759514198684_fskvg68h2_20251003_232653",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:26:53+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:27:10+05:30"
+    },
+    "call_web_user_web_1759514244719_up8m6htgr_20251003_232730": {
+      "worker_id": "worker_web_user_web_1759514244719_up8m6htgr",
+      "mobile_no": "web_user_web_1759514244719_up8m6htgr",
+      "conversation_id": "conv_web_user_web_1759514244719_up8m6htgr_20251003_232730",
+      "urgency": "ASSISTIVE",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:27:30+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:28:40+05:30"
+    },
+    "call_web_user_web_1759514343037_9cs9msaxj_20251003_232923": {
+      "worker_id": "worker_web_user_web_1759514343037_9cs9msaxj",
+      "mobile_no": "web_user_web_1759514343037_9cs9msaxj",
+      "conversation_id": "conv_web_user_web_1759514343037_9cs9msaxj_20251003_232923",
+      "urgency": "NORMAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-03T23:29:23+05:30",
+      "medium": "Voice",
+      "last_message_at": "2025-10-03T23:29:38+05:30"
     }
   },
   "active_conversations": {
@@ -98,6 +248,381 @@
           "content": "Evacuate now. Follow emergency exit routes. Contact emergency response team immediately. Did you understand? Say yes or no.",
           "timestamp": "2025-10-03T02:57:46+05:30",
           "sources": "Emergency Procedures Manual, Fire Safety Protocol"
+        }
+      }
+    },
+    "conv_web_user_1759511428247_20251003_224029": {
+      "call_id": "call_web_user_1759511428247_20251003_224029",
+      "messages": {
+        "msg_web_user_1759511428247_20251003_224029_0001": {
+          "role": "user",
+          "content": "hi",
+          "timestamp": "2025-10-03T22:40:29+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759511428247_20251003_224029_0002": {
+          "role": "assistant",
+          "content": "Hello. How can I assist you today? Do you have a work-related question or need help with a situation?",
+          "timestamp": "2025-10-03T22:40:29+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        }
+      }
+    },
+    "conv_web_user_1759511776233_20251003_224618": {
+      "call_id": "call_web_user_1759511776233_20251003_224618",
+      "messages": {
+        "msg_web_user_1759511776233_20251003_224618_0001": {
+          "role": "user",
+          "content": "[Voice message received - STT processing would happen here]",
+          "timestamp": "2025-10-03T22:46:18+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759511776233_20251003_224618_0002": {
+          "role": "assistant",
+          "content": "Hello, this is Aurora. I'm here to help with any work-related questions or situations. What do you need assistance with today?",
+          "timestamp": "2025-10-03T22:46:18+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        }
+      }
+    },
+    "conv_web_user_1759512230433_20251003_225351": {
+      "call_id": "call_web_user_1759512230433_20251003_225351",
+      "messages": {
+        "msg_web_user_1759512230433_20251003_225351_0001": {
+          "role": "user",
+          "content": "[Voice message received - Audio length: 107300 characters]",
+          "timestamp": "2025-10-03T22:53:51+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512230433_20251003_225351_0002": {
+          "role": "assistant",
+          "content": "It seems like you've received a voice message, but the content of the message isn't provided. Can you please transcribe the message or provide more context about the issue you're facing? I'll do my best to assist you with any work-related questions or concerns.\n\nIf you're ready to proceed, I can offer general guidance. Please let me know what kind of assistance you need (e.g., equipment operation, safety protocols, company policies, etc.).",
+          "timestamp": "2025-10-03T22:53:51+05:30",
+          "sources": "Company Policies, Safety Protocols, Equipment Manuals"
+        }
+      }
+    },
+    "conv_web_user_1759512448477_20251003_225741": {
+      "call_id": "call_web_user_1759512448477_20251003_225741",
+      "messages": {
+        "msg_web_user_1759512448477_20251003_225741_0001": {
+          "role": "user",
+          "content": "V  V",
+          "timestamp": "2025-10-03T22:57:41+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512448477_20251003_225741_0002": {
+          "role": "assistant",
+          "content": "It seems like you didn't ask a question or provide a situation that needs assistance. Please describe the situation or ask your question, and I'll do my best to provide a clear and concise response.",
+          "timestamp": "2025-10-03T22:57:41+05:30",
+          "sources": "Company Policies, Safety Protocols, Standard Operating Procedures"
+        }
+      }
+    },
+    "conv_web_user_1759512750665_20251003_230239": {
+      "call_id": "call_web_user_1759512750665_20251003_230239",
+      "messages": {
+        "msg_web_user_1759512750665_20251003_230239_0001": {
+          "role": "user",
+          "content": "[Speech processing error: [Errno 541478725] End of file: '<none>']",
+          "timestamp": "2025-10-03T23:02:39+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512750665_20251003_230239_0002": {
+          "role": "assistant",
+          "content": "It seems like there was an error in processing your request. As a phone assistant for industrial workers, I'm here to help with any work-related questions or situations. Please go ahead and ask your question, and I'll do my best to provide a clear and concise response.\n\nRemember, I can assist with emergencies, routine tasks, procedures, troubleshooting, and general work guidance. I'll provide step-by-step instructions and reference company policies, procedures, and safety protocols as needed.\n\nWhat's your question or concern?",
+          "timestamp": "2025-10-03T23:02:39+05:30",
+          "sources": "Company Policies, Safety Protocols, Emergency Procedures Manual"
+        }
+      }
+    },
+    "conv_web_user_1759512753143_20251003_230240": {
+      "call_id": "call_web_user_1759512753143_20251003_230240",
+      "messages": {
+        "msg_web_user_1759512753143_20251003_230240_0001": {
+          "role": "user",
+          "content": "[Speech processing error: [Errno 541478725] End of file: '<none>']",
+          "timestamp": "2025-10-03T23:02:40+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512753143_20251003_230240_0002": {
+          "role": "assistant",
+          "content": "It seems like there was an error in processing your request. As a phone assistant for industrial workers, I'm here to help with any work-related questions or situations. \n\nTo get started, could you please describe the situation or ask your question? I'll do my best to provide clear and concise guidance.",
+          "timestamp": "2025-10-03T23:02:40+05:30",
+          "sources": "Company Policies, Safety Protocols, Emergency Procedures Manual"
+        }
+      }
+    },
+    "conv_web_user_1759512781826_20251003_230307": {
+      "call_id": "call_web_user_1759512781826_20251003_230307",
+      "messages": {
+        "msg_web_user_1759512781826_20251003_230307_0001": {
+          "role": "user",
+          "content": "[Speech processing error: [Errno 541478725] End of file: '<none>']",
+          "timestamp": "2025-10-03T23:03:07+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512781826_20251003_230307_0002": {
+          "role": "assistant",
+          "content": "It seems like there was an error in processing your request. As a phone assistant for industrial workers, I'm here to help with any work-related questions or situations. Could you please provide more context or information about what you need help with? I'll do my best to provide a clear and concise response.",
+          "timestamp": "2025-10-03T23:03:07+05:30",
+          "sources": "Company Policies, Safety Protocols, Emergency Procedures Manual"
+        }
+      }
+    },
+    "conv_web_user_1759512793325_20251003_230316": {
+      "call_id": "call_web_user_1759512793325_20251003_230316",
+      "messages": {
+        "msg_web_user_1759512793325_20251003_230316_0001": {
+          "role": "user",
+          "content": "[Speech processing error: [Errno 541478725] End of file: '<none>']",
+          "timestamp": "2025-10-03T23:03:16+05:30",
+          "sources": ""
+        },
+        "msg_web_user_1759512793325_20251003_230316_0002": {
+          "role": "assistant",
+          "content": "It seems like there was an error in processing the speech. Could you please rephrase or provide more context about what you need help with? I'm here to assist you with any work-related questions or situations.\n\nIf you're calling about a specific issue, please let me know and I'll do my best to provide clear and concise guidance.",
+          "timestamp": "2025-10-03T23:03:16+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        }
+      }
+    },
+    "conv_web_user_20251003_231242": {
+      "call_id": "call_web_user_20251003_231242",
+      "messages": {
+        "msg_web_user_20251003_231242_0001": {
+          "role": "user",
+          "content": "Where is first-aid kit located?",
+          "timestamp": "2025-10-03T23:12:42+05:30",
+          "sources": ""
+        },
+        "msg_web_user_20251003_231242_0002": {
+          "role": "assistant",
+          "content": "First-aid kits are available at designated locations throughout the office. Check the nearest office sign for directions. Do you understand? Say yes or no.",
+          "timestamp": "2025-10-03T23:12:42+05:30",
+          "sources": "Company Policies, Emergency Procedures Manual"
+        }
+      }
+    },
+    "conv_web_user_web_1759513837007_pemtdswht_20251003_232040": {
+      "call_id": "call_web_user_web_1759513837007_pemtdswht_20251003_232040",
+      "messages": {
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0001": {
+          "role": "user",
+          "content": "Hello Aurora, this is a test message",
+          "timestamp": "2025-10-03T23:20:40+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0002": {
+          "role": "assistant",
+          "content": "Hello. This is Aurora. How can I assist you today?",
+          "timestamp": "2025-10-03T23:20:40+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0003": {
+          "role": "user",
+          "content": "Hello Aurora, this is a test message",
+          "timestamp": "2025-10-03T23:20:59+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0004": {
+          "role": "assistant",
+          "content": "Hello. This is Aurora. How can I assist you today?",
+          "timestamp": "2025-10-03T23:20:59+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0005": {
+          "role": "user",
+          "content": "where is first aid kit",
+          "timestamp": "2025-10-03T23:21:11+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0006": {
+          "role": "assistant",
+          "content": "First aid kits are available at designated locations throughout the office. Check the nearest office sign or ask a supervisor for the exact location.",
+          "timestamp": "2025-10-03T23:21:11+05:30",
+          "sources": "Company Policies, Emergency Procedures Manual"
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0007": {
+          "role": "user",
+          "content": "one of my friend has fallen down what should I do",
+          "timestamp": "2025-10-03T23:21:54+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759513837007_pemtdswht_20251003_232040_0008": {
+          "role": "assistant",
+          "content": "Call for medical help immediately. Check their airway, breathing, and circulation. If they're unresponsive, start CPR if you're trained.",
+          "timestamp": "2025-10-03T23:21:54+05:30",
+          "sources": "Medical Emergency Procedure, First Aid Guide"
+        }
+      }
+    },
+    "conv_web_user_web_1759513971946_0enad3pqz_20251003_232317": {
+      "call_id": "call_web_user_web_1759513971946_0enad3pqz_20251003_232317",
+      "messages": {
+        "msg_web_user_web_1759513971946_0enad3pqz_20251003_232317_0001": {
+          "role": "user",
+          "content": "where is first aid kit located",
+          "timestamp": "2025-10-03T23:23:17+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759513971946_0enad3pqz_20251003_232317_0002": {
+          "role": "assistant",
+          "content": "First aid kits are available at designated locations throughout the office. Check the nearest office sign or ask a supervisor for the exact location.",
+          "timestamp": "2025-10-03T23:23:17+05:30",
+          "sources": "Company Policies, Emergency Procedures Manual"
+        }
+      }
+    },
+    "conv_web_user_web_1759514135904_zs8ks42qw_20251003_232554": {
+      "call_id": "call_web_user_web_1759514135904_zs8ks42qw_20251003_232554",
+      "messages": {
+        "msg_web_user_web_1759514135904_zs8ks42qw_20251003_232554_0001": {
+          "role": "user",
+          "content": "industrial system how can I help you today describe your situation where is first aid kit located",
+          "timestamp": "2025-10-03T23:25:54+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514135904_zs8ks42qw_20251003_232554_0002": {
+          "role": "assistant",
+          "content": "First aid kits are available at designated locations throughout the office. You can find them in the break room, near the emergency exit, and in the HR department. If you need assistance, please contact the on-site medical staff immediately. Did you understand? Say yes or no.",
+          "timestamp": "2025-10-03T23:25:54+05:30",
+          "sources": "Company Policies, Emergency Procedures Manual"
+        },
+        "msg_web_user_web_1759514135904_zs8ks42qw_20251003_232554_0003": {
+          "role": "user",
+          "content": " one of my friend has fallen down",
+          "timestamp": "2025-10-03T23:26:23+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514135904_zs8ks42qw_20251003_232554_0004": {
+          "role": "assistant",
+          "content": "Contact on-site medical staff immediately. Provide first aid if trained to do so. Keep your friend calm and still until help arrives. Did you understand? Say yes or no.",
+          "timestamp": "2025-10-03T23:26:23+05:30",
+          "sources": "Medical Emergency procedure, First Aid Kit location"
+        }
+      }
+    },
+    "conv_web_user_web_1759514198684_fskvg68h2_20251003_232653": {
+      "call_id": "call_web_user_web_1759514198684_fskvg68h2_20251003_232653",
+      "messages": {
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0001": {
+          "role": "user",
+          "content": "hello hello",
+          "timestamp": "2025-10-03T23:26:53+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0002": {
+          "role": "assistant",
+          "content": "Hello. How can I assist you today?",
+          "timestamp": "2025-10-03T23:26:53+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        },
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0003": {
+          "role": "user",
+          "content": " hello",
+          "timestamp": "2025-10-03T23:26:56+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0004": {
+          "role": "assistant",
+          "content": "Hello. How can I assist you today?",
+          "timestamp": "2025-10-03T23:26:56+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        },
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0005": {
+          "role": "user",
+          "content": " sorry to interrupt Maine vah implement kar diya hai website ka ek bar dekh lo",
+          "timestamp": "2025-10-03T23:27:10+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514198684_fskvg68h2_20251003_232653_0006": {
+          "role": "assistant",
+          "content": "Mujhe khed hai, lekin main samajh nahi paya ki aapne kya kaha. Lagta hai ki aapne kuch Hindi mein kaha hai, lekin main sirf English mein samajh sakta hoon. Kya aap apni baat ko English mein dohrane ke liye taiyar hain?\n\n(Translation: I apologize, but I didn't understand what you said. It seems like you said something in Hindi, but I can only understand English. Are you willing to repeat what you said in English?)",
+          "timestamp": "2025-10-03T23:27:10+05:30",
+          "sources": "None"
+        }
+      }
+    },
+    "conv_web_user_web_1759514244719_up8m6htgr_20251003_232730": {
+      "call_id": "call_web_user_web_1759514244719_up8m6htgr_20251003_232730",
+      "messages": {
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0001": {
+          "role": "user",
+          "content": "restart Kolkata",
+          "timestamp": "2025-10-03T23:27:30+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0002": {
+          "role": "assistant",
+          "content": "To restart in Kolkata, I need to know what you need help with. Are you looking for information on company policies, safety protocols, or something else? \n\nPlease provide more context or clarify your question, and I'll do my best to assist you.",
+          "timestamp": "2025-10-03T23:27:30+05:30",
+          "sources": "Company Documentation, Safety Protocols"
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0003": {
+          "role": "user",
+          "content": " ek second I am a sharing type audio",
+          "timestamp": "2025-10-03T23:27:31+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0004": {
+          "role": "assistant",
+          "content": "I'm here to help with any work-related questions or situations. What do you need assistance with?",
+          "timestamp": "2025-10-03T23:27:31+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0005": {
+          "role": "user",
+          "content": " one of my friend has fallen down what should I do",
+          "timestamp": "2025-10-03T23:28:00+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0006": {
+          "role": "assistant",
+          "content": "Call for medical help immediately. Check their airway, breathing, and circulation. If they're unconscious, not breathing, or not responsive, start CPR if you're trained.",
+          "timestamp": "2025-10-03T23:28:00+05:30",
+          "sources": "Medical Emergency Procedure, First Aid Guide"
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0007": {
+          "role": "user",
+          "content": " hello hello",
+          "timestamp": "2025-10-03T23:28:40+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514244719_up8m6htgr_20251003_232730_0008": {
+          "role": "assistant",
+          "content": "Hello. How can I assist you today?",
+          "timestamp": "2025-10-03T23:28:40+05:30",
+          "sources": "Company Policies, Standard Operating Procedures"
+        }
+      }
+    },
+    "conv_web_user_web_1759514343037_9cs9msaxj_20251003_232923": {
+      "call_id": "call_web_user_web_1759514343037_9cs9msaxj_20251003_232923",
+      "messages": {
+        "msg_web_user_web_1759514343037_9cs9msaxj_20251003_232923_0001": {
+          "role": "user",
+          "content": "there is a gas Lake what should I do answer in one sentence",
+          "timestamp": "2025-10-03T23:29:23+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514343037_9cs9msaxj_20251003_232923_0002": {
+          "role": "assistant",
+          "content": "Evacuate the area immediately and alert others nearby, then contact the emergency response team and follow the gas leak procedure outlined in the Emergency Procedures Manual.",
+          "timestamp": "2025-10-03T23:29:23+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards"
+        },
+        "msg_web_user_web_1759514343037_9cs9msaxj_20251003_232923_0003": {
+          "role": "user",
+          "content": " what are these procedures please tell me",
+          "timestamp": "2025-10-03T23:29:38+05:30",
+          "sources": ""
+        },
+        "msg_web_user_web_1759514343037_9cs9msaxj_20251003_232923_0004": {
+          "role": "assistant",
+          "content": "I'd be happy to walk you through our company's procedures. \n\nWe have procedures for daily operations, emergency situations, and safety protocols. \n\nFor daily operations, employees should arrive at their workstations by 8:30 AM and start their daily tasks by 9:00 AM. \n\nIn case of emergencies, such as a fire, employees should follow the emergency exit routes and gather at the designated assembly point. \n\nFor safety protocols, employees must wear the appropriate Personal Protective Equipment (PPE) at all times, and any hazards should be reported to the safety officer immediately. \n\nDo you understand? Say yes or no.",
+          "timestamp": "2025-10-03T23:29:38+05:30",
+          "sources": "Company Documentation, Standard Operating Procedures (SOP), Safety Protocols"
         }
       }
     }
