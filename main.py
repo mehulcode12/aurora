@@ -955,6 +955,7 @@ async def home():
     </ul>
     
     <p>Powered by Cerebras AI + Twilio + Firebase + Groq + FastAPI</p>
+    <p><strong>🌐 Web Call Interface:</strong> <a href="/web-call" style="color: #007bff;">Try Aurora without a phone!</a></p>
     """
 
 @app.get("/status")
