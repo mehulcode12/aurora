@@ -8,7 +8,7 @@
       "status": "ACTIVE",
       "timestamp": "2025-10-03T11:58:04+05:30",
       "medium": "Voice",
-      "last_message_at": "2025-10-03T12:03:27+05:30"
+      "last_message_at": "2025-10-03T23:43:59+05:30"
     }
   },
   "active_conversations": {
@@ -194,6 +194,18 @@
           "content": "",
           "timestamp": "2025-10-03T12:03:27+05:30",
           "sources": "Emergency Procedures Manual, OSHA Safety Standards, Medical Emergency Protocol"
+        },
+        "msg_919325590143_20251003_115804_0031": {
+          "role": "user",
+          "content": "There is a strong smell of gas leaking.",
+          "timestamp": "2025-10-03T23:43:59+05:30",
+          "sources": ""
+        },
+        "msg_919325590143_20251003_115804_0032": {
+          "role": "assistant",
+          "content": "Evacuate the area immediately. Do not use any electrical devices. Open windows for ventilation if safe to do so. Alert others and contact the emergency response team now. Did you understand? Say yes or no.",
+          "timestamp": "2025-10-03T23:43:59+05:30",
+          "sources": "Emergency Procedures Manual, OSHA Safety Standards, Gas Leak Protocol"
         }
       }
     }
