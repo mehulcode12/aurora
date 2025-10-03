@@ -957,6 +957,26 @@ async def home():
     <p>Powered by Cerebras AI + Twilio + Firebase + Groq + FastAPI</p>
     """
 
+@app.get("/status")
+async def status():
+    """Health check and status endpoint"""
+    return {
+        "status": "online",
+        "message": "Aurora Emergency Assistant is running",
+        "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
+        "version": "2.0.0",
+        "services": {
+            "aurora_llm": "active" if config.CEREBRAS_API_KEY else "inactive",
+            "twilio": "active" if config.TWILIO_ACCOUNT_SID else "inactive",
+            "web_call": "active"
+        }
+    }
+
+@app.get("/hello")
+async def hello():
+    """Simple hello endpoint"""
+    return {"message": "Hello! Aurora Emergency Assistant is ready to help."}
+
 @app.get("/health/redis")
 async def check_redis():
     """Health check endpoint for Redis connection"""
@@ -1249,6 +1269,239 @@ async def hangup(CallSid: str = Form(...)):
     response.hangup()
     
     return Response(content=str(response), media_type="application/xml")
+
+@app.get("/web-call", response_class=HTMLResponse)
+async def web_call():
+    """Web-based phone simulation interface"""
+    
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Aurora Emergency Assistant - Web Call</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+            .phone-container { background: #1a1a1a; border-radius: 30px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; width: 350px; max-width: 90vw; }
+            .phone-header { color: #fff; margin-bottom: 20px; }
+            .phone-header h1 { font-size: 18px; margin-bottom: 5px; }
+            .phone-header p { font-size: 12px; opacity: 0.7; }
+            .status-display { background: #000; border-radius: 10px; padding: 15px; margin: 20px 0; min-height: 100px; color: #00ff00; font-family: 'Courier New', monospace; font-size: 14px; text-align: left; overflow-y: auto; max-height: 200px; }
+            .call-controls { margin: 20px 0; }
+            .call-button { background: #00ff00; color: #000; border: none; border-radius: 50%; width: 80px; height: 80px; font-size: 16px; font-weight: bold; cursor: pointer; margin: 10px; transition: all 0.3s; }
+            .call-button:hover { transform: scale(1.1); }
+            .call-button.call { background: #00ff00; }
+            .call-button.hangup { background: #ff4444; color: #fff; }
+            .call-button.speaking { background: #ffaa00; animation: pulse 1s infinite; }
+            @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+            .microphone-button { background: #444; color: #fff; border: none; border-radius: 50%; width: 60px; height: 60px; margin: 10px; cursor: pointer; transition: all 0.3s; }
+            .microphone-button:hover { background: #666; }
+            .microphone-button.listening { background: #ff4444; animation: pulse 1s infinite; }
+            .audio-controls { margin: 20px 0; }
+            .volume-control { width: 100%; margin: 10px 0; }
+            .instructions { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-top: 20px; color: #fff; font-size: 12px; }
+            .instructions h3 { margin-bottom: 10px; }
+            .instructions ul { list-style: none; padding-left: 0; }
+            .instructions li { margin: 5px 0; padding-left: 15px; position: relative; }
+            .instructions li:before { content: "📞"; position: absolute; left: 0; }
+            .hidden { display: none; }
+            .thinking { animation: blink 1s infinite; }
+            @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
+        </style>
+    </head>
+    <body>
+        <div class="phone-container">
+            <div class="phone-header">
+                <h1>🚨 Aurora Emergency Assistant</h1>
+                <p>Web Phone Simulation</p>
+            </div>
+            <div class="status-display" id="statusDisplay">
+                <div id="statusMessages">Ready to start call...</div>
+            </div>
+            <div class="call-controls">
+                <button id="startCall" class="call-button call">Start Call</button>
+                <button id="endCall" class="call-button hangup hidden">End Call</button>
+            </div>
+            <div class="audio-controls">
+                <button id="micButton" class="microphone-button listening">🎤</button>
+                <button id="testButton" class="microphone-button" style="background: #0066cc;">Test</button>
+                <div><label for="volumeRange" style="color: #fff; font-size: 12px;">Volume:</label><input type="range" id="volumeRange" class="volume-control" min="0" max="100" value="50"></div>
+            </div>
+            <div class="instructions">
+                <h3>📋 Instructions:</h3>
+                <ul><li>Aurora is always listening - just speak naturally</li><li>Click "Test" to test API connection</li><li>Allow microphone access when prompted</li><li>Speak clearly to Aurora</li><li>Wait for Aurora's response</li><li>Optional: Click "Start Call" for formal call mode</li></ul>
+            </div>
+        </div>
+        <script>
+            class AuroraWebCall {
+                constructor() {
+                    this.isCallActive = false; this.isListening = false; this.conversationHistory = []; this.callId = this.generateCallId(); this.synthesis = window.speechSynthesis; this.apiBase = window.location.origin; this.recognition = null;
+                    this.initializeElements(); this.setupEventListeners(); this.checkMicrophonePermissions(); this.startContinuousListening();
+                }
+                initializeElements() {
+                    this.statusDisplay = document.getElementById('statusDisplay'); this.statusMessages = document.getElementById('statusMessages'); this.startCallBtn = document.getElementById('startCall'); this.endCallBtn = document.getElementById('endCall'); this.micButton = document.getElementById('micButton'); this.testButton = document.getElementById('testButton'); this.audioControls = document.getElementById('audioControls'); this.volumeRange = document.getElementById('volumeRange');
+                }
+                setupEventListeners() {
+                    this.startCallBtn.addEventListener('click', () => this.startCall());
+                    this.endCallBtn.addEventListener('click', () => this.endCall());
+                    this.testButton.addEventListener('click', () => this.testAPI());
+                    this.volumeRange.addEventListener('input', (e) => { const volume = e.target.value / 100; localStorage.setItem('auroraVolume', volume); });
+                    const savedVolume = localStorage.getItem('auroraVolume') || 0.5; this.volumeRange.value = savedVolume * 100;
+                }
+                generateCallId() { return 'web_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9); }
+                
+                startContinuousListening() {
+                    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+                        this.addStatusMessage('❌ Speech recognition not supported in this browser', 'error');
+                        return;
+                    }
+
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    
+                    this.recognition.continuous = true;
+                    this.recognition.interimResults = false;
+                    this.recognition.lang = 'en-US';
+                    this.recognition.maxAlternatives = 1;
+
+                    this.recognition.onstart = () => {
+                        this.addStatusMessage('🎤 Continuous listening started - Aurora is always listening', 'success');
+                        this.micButton.classList.add('listening');
+                    };
+
+                    this.recognition.onresult = (event) => {
+                        if (event.results.length > 0) {
+                            const transcript = event.results[event.results.length - 1][0].transcript;
+                            if (transcript.trim().length > 2) {
+                                this.addStatusMessage(`👤 You: ${transcript}`, 'user');
+                                this.processSpeech(transcript);
+                            }
+                        }
+                    };
+
+                    this.recognition.onerror = (event) => {
+                        this.addStatusMessage(`❌ Speech recognition error: ${event.error}`, 'error');
+                        if (event.error === 'not-allowed') {
+                            this.addStatusMessage('❌ Microphone access denied. Please allow microphone access.', 'error');
+                        }
+                    };
+
+                    this.recognition.onend = () => {
+                        this.addStatusMessage('🔄 Restarting continuous listening...', 'info');
+                        setTimeout(() => {
+                            try {
+                                this.recognition.start();
+                            } catch (error) {
+                                this.addStatusMessage(`❌ Error restarting speech recognition: ${error.message}`, 'error');
+                            }
+                        }, 1000);
+                    };
+
+                    try {
+                        this.recognition.start();
+                    } catch (error) {
+                        this.addStatusMessage(`❌ Error starting continuous speech recognition: ${error.message}`, 'error');
+                    }
+                }
+                checkMicrophonePermissions() {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        this.addStatusMessage('❌ Browser does not support microphone access', 'error');
+                        return;
+                    }
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(() => { 
+                            this.addStatusMessage('✓ Microphone access ready', 'success'); 
+                        })
+                        .catch((error) => { 
+                            this.addStatusMessage(`❌ Microphone access denied: ${error.message}`, 'error'); 
+                        });
+                }
+                addStatusMessage(message, type = 'info') {
+                    const timestamp = new Date().toLocaleTimeString();
+                    const color = type === 'error' ? '#ff4444' : type === 'success' ? '#00ff00' : '#00ff00';
+                    this.statusMessages.innerHTML += `<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`;
+                    this.statusDisplay.scrollTop = this.statusDisplay.scrollHeight;
+                }
+                async startCall() {
+                    try {
+                        this.isCallActive = true; this.startCallBtn.classList.add('hidden'); this.endCallBtn.classList.remove('hidden');
+                        this.addStatusMessage('🔄 Calling Aurora...', 'info');
+                        setTimeout(() => {
+                            this.addStatusMessage('📞 Aurora: Aurora industrial assistant. How can I help you today? Describe your situation or question. You may speak now.', 'info');
+                            this.speakText('Aurora industrial assistant. How can I help you today? Describe your situation or question. You may speak now.');
+                        }, 1500);
+                    } catch (error) { this.addStatusMessage(`❌ Error starting call: ${error.message}`, 'error'); }
+                }
+                async endCall() {
+                    this.isCallActive = false; this.startCallBtn.classList.remove('hidden'); this.endCallBtn.classList.add('hidden'); this.micButton.classList.remove('speaking'); this.synthesis.cancel(); this.addStatusMessage('📞 Call ended. Aurora continues listening.', 'info');
+                }
+                
+                async testAPI() {
+                    this.addStatusMessage('🧪 Testing API connection...', 'info');
+                    try {
+                        const testSpeech = "Hello Aurora, this is a test message";
+                        await this.processSpeech(testSpeech);
+                    } catch (error) {
+                        this.addStatusMessage(`❌ Test failed: ${error.message}`, 'error');
+                    }
+                }
+                async processSpeech(userSpeech) {
+                    this.micButton.classList.add('speaking', 'thinking'); 
+                    this.addStatusMessage('🤖 Aurora is thinking...', 'thinking');
+                    
+                    try {
+                        this.addStatusMessage(`📤 Sending to Aurora: "${userSpeech}"`, 'info');
+                        
+                        const response = await fetch(`${this.apiBase}/api/process-speech`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ 
+                                speech: userSpeech, 
+                                ph_no: `web_user_${this.callId}` 
+                            }) 
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const data = await response.json();
+                        this.addStatusMessage(`📥 Received from Aurora: ${JSON.stringify(data)}`, 'info');
+                        
+                        if (data.message) { 
+                            this.addStatusMessage(`🤖 Aurora: ${data.message}`, 'aurora'); 
+                            this.speakText(data.message); 
+                        } else { 
+                            throw new Error('No message in Aurora response'); 
+                        }
+                    } catch (error) { 
+                        this.addStatusMessage(`❌ Error processing speech: ${error.message}`, 'error'); 
+                        this.speakText("I'm experiencing technical difficulties. Please try again."); 
+                    } finally {
+                        setTimeout(() => { 
+                            this.micButton.classList.remove('speaking', 'thinking'); 
+                        }, 2000);
+                    }
+                }
+                speakText(text) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.8; utterance.pitch = 1.0; utterance.volume = this.volumeRange.value / 100;
+                    const voices = this.synthesis.getVoices();
+                    const preferredVoice = voices.find(voice => voice.name.includes('Microsoft') || voice.name.includes('Google') || voice.name.includes('male'));
+                    if (preferredVoice) { utterance.voice = preferredVoice; }
+                    utterance.onend = () => { this.micButton.classList.remove('speaking'); };
+                    this.synthesis.speak(utterance);
+                }
+            }
+            document.addEventListener('DOMContentLoaded', () => { new AuroraWebCall(); });
+        </script>
+    </body>
+    </html>
+    """
+
+
 
 # ============================================================================
 # ENDPOINTS - ADMIN AUTHENTICATION
