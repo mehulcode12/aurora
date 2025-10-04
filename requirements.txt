@@ -18,6 +18,7 @@ pdfplumber
 python-docx
 redis==5.0.1
 requests==2.31.0
+resend
 
 
 sounddevice 

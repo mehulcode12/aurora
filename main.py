@@ -31,12 +31,10 @@ import os
 import json
 import uuid
 import random
-import smtplib
 import asyncio
 import time
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import redis
+import resend
 import firebase_admin
 from firebase_admin import credentials, firestore, db, initialize_app, auth
 import PyPDF2
@@ -47,7 +45,6 @@ import requests
 
 # Load environment variables
 load_dotenv()
-
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -123,11 +120,9 @@ class Config:
     TEMP_TOKEN_EXPIRE_MINUTES = 15
     ACCESS_TOKEN_EXPIRE_HOURS = 24
     
-    # SMTP settings
-    SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-    SMTP_PORT = int(os.getenv('SMTP_PORT', 465))  # Changed from 587 to 465
-    SMTP_EMAIL = os.getenv('SMTP_EMAIL')
-    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+    # Resend Email settings
+    RESEND_API_KEY = os.getenv('RESEND_API_KEY')
+    RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
     
     # Redis settings
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
@@ -136,6 +131,11 @@ class Config:
     REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 
 config = Config()
+
+# ============================================================================
+# RESEND EMAIL INITIALIZATION
+# ============================================================================
+resend.api_key = config.RESEND_API_KEY
 
 # ============================================================================
 # REDIS INITIALIZATION
@@ -646,59 +646,40 @@ def generate_otp() -> str:
     return ''.join([str(random.randint(0, 9)) for _ in range(6)])
 
 def send_otp_email(recipient_email: str, otp: str) -> bool:
-    """Send OTP via SMTP email"""
+    """Send OTP via Resend email service"""
     try:
-        message = MIMEMultipart("alternative")
-        message["Subject"] = "Your OTP for Aurora Admin Registration"
-        message["From"] = config.SMTP_EMAIL
-        message["To"] = recipient_email
+        print(f"📧 Attempting to send OTP email to {recipient_email}")
         
-        text = f"""
-        Hello,
+        params: resend.Emails.SendParams = {
+            "from": config.RESEND_FROM_EMAIL,
+            "to": [recipient_email],
+            "subject": "Your OTP for Aurora Admin Registration",
+            "html": f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                  <h2 style="color: #4CAF50; text-align: center;">Aurora Admin Registration</h2>
+                  <p>Hello,</p>
+                  <p>Your OTP for Aurora Admin registration is:</p>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <h1 style="color: #4CAF50; font-size: 36px; letter-spacing: 8px; background-color: #f5f5f5; padding: 20px; border-radius: 5px;">{otp}</h1>
+                  </div>
+                  <p>This OTP will expire in <strong>10 minutes</strong>.</p>
+                  <p>If you did not request this OTP, please ignore this email.</p>
+                  <br>
+                  <p style="color: #666;">Best regards,<br><strong>Aurora Emergency Assistant Team</strong></p>
+                </div>
+              </body>
+            </html>
+            """,
+        }
         
-        Your OTP for Aurora Admin registration is: {otp}
-        
-        This OTP will expire in 10 minutes.
-        
-        If you did not request this OTP, please ignore this email.
-        
-        Best regards,
-        Aurora Team
-        """
-        
-        html = f"""
-        <html>
-          <body>
-            <h2>Aurora Admin Registration</h2>
-            <p>Hello,</p>
-            <p>Your OTP for Aurora Admin registration is:</p>
-            <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px;">{otp}</h1>
-            <p>This OTP will expire in <strong>10 minutes</strong>.</p>
-            <p>If you did not request this OTP, please ignore this email.</p>
-            <br>
-            <p>Best regards,<br>Aurora Team</p>
-          </body>
-        </html>
-        """
-        
-        part1 = MIMEText(text, "plain")
-        part2 = MIMEText(html, "html")
-        message.attach(part1)
-        message.attach(part2)
-        
-        # with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
-        #     server.starttls()
-        #     server.login(config.SMTP_EMAIL, config.SMTP_PASSWORD)
-        #     server.sendmail(config.SMTP_EMAIL, recipient_email, message.as_string())
-
-        # Use SMTP_SSL for port 465
-        with smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT) as server:
-            server.login(config.SMTP_EMAIL, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_EMAIL, recipient_email, message.as_string())
-
+        email: resend.Email = resend.Emails.send(params)
+        print(f"✅ Email sent successfully via Resend. Email ID: {email.get('id', 'N/A')}")
         return True
+        
     except Exception as e:
-        print(f"Error sending email: {str(e)}")
+        print(f"❌ Error sending email via Resend: {str(e)}")
         return False
 
 def check_email_exists(email: str) -> bool:

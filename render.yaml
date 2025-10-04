@@ -23,13 +23,9 @@ services:
         sync: false
       - key: FIREBASE_DATABASE_URL
         sync: false
-      - key: SMTP_SERVER
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: 465  # Changed from 587 to 465
-      - key: SMTP_EMAIL
+      - key: RESEND_API_KEY
         sync: false
-      - key: SMTP_PASSWORD
+      - key: RESEND_FROM_EMAIL
         sync: false
       - key: REDIS_HOST
         sync: false
