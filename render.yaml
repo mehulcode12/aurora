@@ -26,7 +26,7 @@ services:
       - key: SMTP_SERVER
         value: smtp.gmail.com
       - key: SMTP_PORT
-        value: 587
+        value: 465  # Changed from 587 to 465
       - key: SMTP_EMAIL
         sync: false
       - key: SMTP_PASSWORD

@@ -125,7 +125,7 @@ class Config:
     
     # SMTP settings
     SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-    SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+    SMTP_PORT = int(os.getenv('SMTP_PORT', 465))  # Changed from 587 to 465
     SMTP_EMAIL = os.getenv('SMTP_EMAIL')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
     
@@ -686,11 +686,16 @@ def send_otp_email(recipient_email: str, otp: str) -> bool:
         message.attach(part1)
         message.attach(part2)
         
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
-            server.starttls()
+        # with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
+        #     server.starttls()
+        #     server.login(config.SMTP_EMAIL, config.SMTP_PASSWORD)
+        #     server.sendmail(config.SMTP_EMAIL, recipient_email, message.as_string())
+
+        # Use SMTP_SSL for port 465
+        with smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT) as server:
             server.login(config.SMTP_EMAIL, config.SMTP_PASSWORD)
             server.sendmail(config.SMTP_EMAIL, recipient_email, message.as_string())
-        
+
         return True
     except Exception as e:
         print(f"Error sending email: {str(e)}")
