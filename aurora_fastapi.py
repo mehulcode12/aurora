@@ -703,15 +703,16 @@ async def process_speech(
 async def api_process_speech(request: Request):
     """API endpoint for processing speech and returning JSON response"""
     try:
-        # Try to get JSON data first, then form data
         if request.headers.get("content-type") == "application/json":
             data = await request.json()
             speech_result = data.get('speech', '')
             phone_number = data.get('ph_no', 'Unknown')
+            history = data.get('history', [])  # Get conversation history
         else:
             form_data = await request.form()
             speech_result = form_data.get('SpeechResult', '')
             phone_number = form_data.get('From', 'Unknown')
+            history = []
         
         if not speech_result or len(speech_result.strip()) < 3:
             return JSONResponse({
@@ -720,11 +721,11 @@ async def api_process_speech(request: Request):
                 "urgency": "normal"
             })
         
-        aurora_response, urgency_level, sources = aurora_llm.generate_response([], speech_result)
+        # IMPORTANT: Pass history to generate_response (not empty list)
+        aurora_response, urgency_level, sources = aurora_llm.generate_response(history, speech_result)
         
+        print(f"   📜 History length: {len(history)} messages")
         print(f"   🤖 Aurora: {aurora_response}")
-        print(f"   📊 Urgency Level: {urgency_level}")
-        print(f"   📚 Sources: {sources}")
         
         call_id, conv_id = active_calls_manager.add_conversation_entry(
             phone_number=phone_number,
@@ -747,7 +748,7 @@ async def api_process_speech(request: Request):
             "ph_no": "Unknown",
             "urgency": "normal"
         })
-
+           
 @app.get("/api/active-calls")
 async def get_active_calls():
     """Get all active calls and conversations data"""
@@ -827,219 +828,296 @@ async def web_call():
     <title>Aurora Emergency Assistant - Web Call</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .phone-container { background: #1a1a1a; border-radius: 30px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; width: 350px; max-width: 90vw; }
-        .phone-header { color: #fff; margin-bottom: 20px; }
-        .phone-header h1 { font-size: 18px; margin-bottom: 5px; }
-        .phone-header p { font-size: 12px; opacity: 0.7; }
-        .status-display { background: #000; border-radius: 10px; padding: 15px; margin: 20px 0; min-height: 100px; color: #00ff00; font-family: 'Courier New', monospace; font-size: 14px; text-align: left; overflow-y: auto; max-height: 200px; }
-        .call-controls { margin: 20px 0; }
-        .call-button { background: #00ff00; color: #000; border: none; border-radius: 50%; width: 80px; height: 80px; font-size: 16px; font-weight: bold; cursor: pointer; margin: 10px; transition: all 0.3s; }
-        .call-button:hover { transform: scale(1.1); }
-        .call-button.call { background: #00ff00; }
-        .call-button.hangup { background: #ff4444; color: #fff; }
-        .call-button.speaking { background: #ffaa00; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .microphone-button { background: #444; color: #fff; border: none; border-radius: 50%; width: 60px; height: 60px; margin: 10px; cursor: pointer; transition: all 0.3s; }
-        .microphone-button:hover { background: #666; }
-        .microphone-button.listening { background: #ff4444; animation: pulse 1s infinite; }
-        .audio-controls { margin: 20px 0; }
-        .volume-control { width: 100%; margin: 10px 0; }
-        .instructions { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-top: 20px; color: #fff; font-size: 12px; }
-        .instructions h3 { margin-bottom: 10px; }
-        .instructions ul { list-style: none; padding-left: 0; }
-        .instructions li { margin: 5px 0; padding-left: 15px; position: relative; }
-        .instructions li:before { content: "📞"; position: absolute; left: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .phone-container { 
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 400px;
+            max-width: 90vw;
+        }
+        .header { 
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 { 
+            font-size: 24px;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        .header p { 
+            font-size: 14px;
+            color: #718096;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #48bb78;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .conversation {
+            background: #f7fafc;
+            border-radius: 16px;
+            padding: 16px;
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        .message {
+            margin: 12px 0;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: 20%;
+        }
+        .message.aurora {
+            background: #e6fffa;
+            color: #234e52;
+            border-left: 3px solid #48bb78;
+            margin-right: 20%;
+        }
+        .message.system {
+            background: #edf2f7;
+            color: #4a5568;
+            font-size: 12px;
+            text-align: center;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-primary {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+        .btn-secondary {
+            background: #4299e1;
+            color: white;
+        }
+        .volume-section {
+            margin: 20px 0;
+        }
+        .volume-label {
+            font-size: 13px;
+            color: #4a5568;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .volume-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+        }
         .hidden { display: none; }
-        .thinking { animation: blink 1s infinite; }
-        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
     </style>
 </head>
 <body>
     <div class="phone-container">
-        <div class="phone-header">
-            <h1>🚨 Aurora Emergency Assistant</h1>
-            <p>Web Phone Simulation</p>
+        <div class="header">
+            <h1>🚨 Aurora Assistant</h1>
+            <p>AI Emergency Support</p>
+            <span class="status-badge" id="status">Always Listening</span>
         </div>
-        <div class="status-display" id="statusDisplay">
-            <div id="statusMessages">Ready to start call...</div>
+        
+        <div class="conversation" id="conversation">
+            <div class="message system">Ready to assist. Speak naturally or click Start Call.</div>
         </div>
-        <div class="call-controls">
-            <button id="startCall" class="call-button call">Start Call</button>
-            <button id="endCall" class="call-button hangup hidden">End Call</button>
+        
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">Start Call</button>
+            <button id="endBtn" class="btn btn-danger hidden">End Call</button>
+            <button id="testBtn" class="btn btn-secondary">Test</button>
         </div>
-        <div class="audio-controls">
-            <button id="micButton" class="microphone-button listening">🎤</button>
-            <button id="testButton" class="microphone-button" style="background: #0066cc;">Test</button>
-            <div><label for="volumeRange" style="color: #fff; font-size: 12px;">Volume:</label><input type="range" id="volumeRange" class="volume-control" min="0" max="100" value="50"></div>
-        </div>
-        <div class="instructions">
-            <h3>📋 Instructions:</h3>
-            <ul><li>Aurora is always listening - just speak naturally</li><li>Click "Test" to test API connection</li><li>Allow microphone access when prompted</li><li>Speak clearly to Aurora</li><li>Wait for Aurora's response</li><li>Optional: Click "Start Call" for formal call mode</li></ul>
+        
+        <div class="volume-section">
+            <div class="volume-label">
+                <span>Volume</span>
+                <span id="volumeVal">50%</span>
+            </div>
+            <input type="range" id="volume" class="volume-slider" min="0" max="100" value="50">
         </div>
     </div>
+
     <script>
-        class AuroraWebCall {
+        class AuroraCall {
             constructor() {
-                this.isCallActive = false; this.isListening = false; this.conversationHistory = []; this.callId = this.generateCallId(); this.synthesis = window.speechSynthesis; this.apiBase = window.location.origin; this.recognition = null;
-                this.initializeElements(); this.setupEventListeners(); this.checkMicrophonePermissions(); this.startContinuousListening();
+                this.conv = document.getElementById('conversation');
+                this.status = document.getElementById('status');
+                this.startBtn = document.getElementById('startBtn');
+                this.endBtn = document.getElementById('endBtn');
+                this.testBtn = document.getElementById('testBtn');
+                this.volume = document.getElementById('volume');
+                this.volumeVal = document.getElementById('volumeVal');
+                this.synthesis = window.speechSynthesis;
+                this.recognition = null;
+                this.currentVolume = 0.5;
+                this.history = []; // Store conversation history
+                
+                this.startBtn.onclick = () => this.startCall();
+                this.endBtn.onclick = () => this.endCall();
+                this.testBtn.onclick = () => this.test();
+                this.volume.oninput = (e) => {
+                    this.currentVolume = e.target.value / 100;
+                    this.volumeVal.textContent = e.target.value + '%';
+                };
+                
+                this.initSpeech();
             }
-            initializeElements() {
-                this.statusDisplay = document.getElementById('statusDisplay'); this.statusMessages = document.getElementById('statusMessages'); this.startCallBtn = document.getElementById('startCall'); this.endCallBtn = document.getElementById('endCall'); this.micButton = document.getElementById('micButton'); this.testButton = document.getElementById('testButton'); this.audioControls = document.getElementById('audioControls'); this.volumeRange = document.getElementById('volumeRange');
-            }
-            setupEventListeners() {
-                this.startCallBtn.addEventListener('click', () => this.startCall());
-                this.endCallBtn.addEventListener('click', () => this.endCall());
-                this.testButton.addEventListener('click', () => this.testAPI());
-                this.volumeRange.addEventListener('input', (e) => { const volume = e.target.value / 100; localStorage.setItem('auroraVolume', volume); });
-                const savedVolume = localStorage.getItem('auroraVolume') || 0.5; this.volumeRange.value = savedVolume * 100;
-            }
-            generateCallId() { return 'web_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9); }
             
-            startContinuousListening() {
-                if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-                    this.addStatusMessage('❌ Speech recognition not supported in this browser', 'error');
+            initSpeech() {
+                if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                    this.addMsg('Speech not supported', 'system');
                     return;
                 }
-
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                this.recognition = new SpeechRecognition();
                 
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                this.recognition = new SR();
                 this.recognition.continuous = true;
-                this.recognition.interimResults = false;
                 this.recognition.lang = 'en-US';
-                this.recognition.maxAlternatives = 1;
-
-                this.recognition.onstart = () => {
-                    this.addStatusMessage('🎤 Continuous listening started - Aurora is always listening', 'success');
-                    this.micButton.classList.add('listening');
-                };
-
-                this.recognition.onresult = (event) => {
-                    if (event.results.length > 0) {
-                        const transcript = event.results[event.results.length - 1][0].transcript;
-                        if (transcript.trim().length > 2) {
-                            this.addStatusMessage(`👤 You: ${transcript}`, 'user');
-                            this.processSpeech(transcript);
-                        }
+                
+                this.recognition.onresult = (e) => {
+                    const text = e.results[e.results.length - 1][0].transcript;
+                    if (text.trim().length > 2) {
+                        this.addMsg(text, 'user');
+                        this.process(text);
                     }
                 };
-
-                this.recognition.onerror = (event) => {
-                    this.addStatusMessage(`❌ Speech recognition error: ${event.error}`, 'error');
-                    if (event.error === 'not-allowed') {
-                        this.addStatusMessage('❌ Microphone access denied. Please allow microphone access.', 'error');
+                
+                this.recognition.onerror = (e) => {
+                    if (e.error === 'not-allowed') {
+                        this.addMsg('Microphone blocked', 'system');
                     }
                 };
-
+                
                 this.recognition.onend = () => {
-                    this.addStatusMessage('🔄 Restarting continuous listening...', 'info');
                     setTimeout(() => {
-                        try {
-                            this.recognition.start();
-                        } catch (error) {
-                            this.addStatusMessage(`❌ Error restarting speech recognition: ${error.message}`, 'error');
-                        }
+                        try { this.recognition.start(); } catch(e) {}
                     }, 1000);
                 };
-
-                try {
-                    this.recognition.start();
-                } catch (error) {
-                    this.addStatusMessage(`❌ Error starting continuous speech recognition: ${error.message}`, 'error');
-                }
-            }
-            checkMicrophonePermissions() {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    this.addStatusMessage('❌ Browser does not support microphone access', 'error');
-                    return;
-                }
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(() => { 
-                        this.addStatusMessage('✓ Microphone access ready', 'success'); 
-                    })
-                    .catch((error) => { 
-                        this.addStatusMessage(`❌ Microphone access denied: ${error.message}`, 'error'); 
-                    });
-            }
-            addStatusMessage(message, type = 'info') {
-                const timestamp = new Date().toLocaleTimeString();
-                const color = type === 'error' ? '#ff4444' : type === 'success' ? '#00ff00' : '#00ff00';
-                this.statusMessages.innerHTML += `<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`;
-                this.statusDisplay.scrollTop = this.statusDisplay.scrollHeight;
-            }
-            async startCall() {
-                try {
-                    this.isCallActive = true; this.startCallBtn.classList.add('hidden'); this.endCallBtn.classList.remove('hidden');
-                    this.addStatusMessage('🔄 Calling Aurora...', 'info');
-                    setTimeout(() => {
-                        this.addStatusMessage('📞 Aurora: Aurora industrial assistant. How can I help you today? Describe your situation or question. You may speak now.', 'info');
-                        this.speakText('Aurora industrial assistant. How can I help you today? Describe your situation or question. You may speak now.');
-                    }, 1500);
-                } catch (error) { this.addStatusMessage(`❌ Error starting call: ${error.message}`, 'error'); }
-            }
-            async endCall() {
-                this.isCallActive = false; this.startCallBtn.classList.remove('hidden'); this.endCallBtn.classList.add('hidden'); this.micButton.classList.remove('speaking'); this.synthesis.cancel(); this.addStatusMessage('📞 Call ended. Aurora continues listening.', 'info');
+                
+                try { this.recognition.start(); } catch(e) {}
             }
             
-            async testAPI() {
-                this.addStatusMessage('🧪 Testing API connection...', 'info');
-                try {
-                    const testSpeech = "Hello Aurora, this is a test message";
-                    await this.processSpeech(testSpeech);
-                } catch (error) {
-                    this.addStatusMessage(`❌ Test failed: ${error.message}`, 'error');
-                }
+            addMsg(text, type) {
+                const div = document.createElement('div');
+                div.className = `message ${type}`;
+                div.textContent = text;
+                this.conv.appendChild(div);
+                this.conv.scrollTop = this.conv.scrollHeight;
             }
-            async processSpeech(userSpeech) {
-                this.micButton.classList.add('speaking', 'thinking'); 
-                this.addStatusMessage('🤖 Aurora is thinking...', 'thinking');
-                
+            
+            startCall() {
+                this.startBtn.classList.add('hidden');
+                this.endBtn.classList.remove('hidden');
+                this.status.textContent = 'Call Active';
+                this.addMsg('Calling Aurora...', 'system');
+                setTimeout(() => {
+                    const msg = 'Aurora here. How can I help you today?';
+                    this.addMsg(msg, 'aurora');
+                    this.speak(msg);
+                }, 1500);
+            }
+            
+            endCall() {
+                this.endBtn.classList.add('hidden');
+                this.startBtn.classList.remove('hidden');
+                this.status.textContent = 'Always Listening';
+                this.synthesis.cancel();
+                this.addMsg('Call ended', 'system');
+            }
+            
+            test() {
+                this.addMsg('Testing...', 'system');
+                this.process('Hello Aurora, test message');
+            }
+            
+            async process(text) {
                 try {
-                    this.addStatusMessage(`📤 Sending to Aurora: "${userSpeech}"`, 'info');
+                    // Add user message to history
+                    this.history.push({role: 'user', content: text});
                     
-                    const response = await fetch(`${this.apiBase}/api/process-speech`, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify({ 
-                            speech: userSpeech, 
-                            ph_no: `web_user_${this.callId}` 
-                        }) 
+                    // Keep only last 10 exchanges (20 messages)
+                    if (this.history.length > 20) {
+                        this.history = this.history.slice(-20);
+                    }
+                    
+                    const res = await fetch('/api/process-speech', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            speech: text, 
+                            ph_no: 'web_user',
+                            history: this.history.slice(-20) // Send last 10 exchanges
+                        })
                     });
+                    const data = await res.json();
                     
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
+                    // Add assistant response to history
+                    this.history.push({role: 'assistant', content: data.message});
                     
-                    const data = await response.json();
-                    this.addStatusMessage(`📥 Received from Aurora: ${JSON.stringify(data)}`, 'info');
-                    
-                    if (data.message) { 
-                        this.addStatusMessage(`🤖 Aurora: ${data.message}`, 'aurora'); 
-                        this.speakText(data.message); 
-                    } else { 
-                        throw new Error('No message in Aurora response'); 
-                    }
-                } catch (error) { 
-                    this.addStatusMessage(`❌ Error processing speech: ${error.message}`, 'error'); 
-                    this.speakText("I'm experiencing technical difficulties. Please try again."); 
-                } finally {
-                    setTimeout(() => { 
-                        this.micButton.classList.remove('speaking', 'thinking'); 
-                    }, 2000);
+                    this.addMsg(data.message, 'aurora');
+                    this.speak(data.message);
+                } catch(e) {
+                    this.addMsg('Error: ' + e.message, 'system');
                 }
             }
-            speakText(text) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 0.8; utterance.pitch = 1.0; utterance.volume = this.volumeRange.value / 100;
-                const voices = this.synthesis.getVoices();
-                const preferredVoice = voices.find(voice => voice.name.includes('Microsoft') || voice.name.includes('Google') || voice.name.includes('male'));
-                if (preferredVoice) { utterance.voice = preferredVoice; }
-                utterance.onend = () => { this.micButton.classList.remove('speaking'); };
-                this.synthesis.speak(utterance);
+            
+            speak(text) {
+                this.synthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.rate = 0.9;
+                u.volume = this.currentVolume;
+                this.synthesis.speak(u);
             }
         }
-        document.addEventListener('DOMContentLoaded', () => { new AuroraWebCall(); });
+        
+        new AuroraCall();
     </script>
 </body>
 </html>
@@ -1098,6 +1176,12 @@ async def startup_event():
     print("5. Status Callback URL: https://your-ngrok-url.ngrok.io/call-status")
     print("6. Save and call your Twilio number!")
     print("7. Web Call Interface: http://localhost:5000/web-call")
+    print("="*70)
+    print("\n🚀 Aurora Phone System Ready!")
+    print(f"📞 Server running on http://localhost:5000")
+    print(f"📚 API Documentation: http://localhost:5000/docs")
+    print(f"🔗 Use ngrok to expose: ngrok http 5000\n")
+    print(f"🔗 Use ngrok to expose: ngrok http 5000\n")
     print("="*70)
     print("\n🚀 Aurora Phone System Ready!")
     print(f"📞 Server running on http://localhost:5000")
