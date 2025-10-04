@@ -453,7 +453,8 @@ class ActiveCallsManager:
                 messages.append({
                     "role": msg_data.get("role", "user"),
                     "content": msg_data.get("content", ""),
-                    "timestamp": msg_data.get("timestamp", "")
+                    "timestamp": msg_data.get("timestamp", ""),
+                    "sources": msg_data.get("sources", "")
                 })
             
             # Prepare conversation document following Firestore schema
@@ -784,6 +785,47 @@ class ConversationSnapshot(BaseModel):
 class GetConversationResponse(BaseModel):
     success: bool
     conversation: ConversationSnapshot
+
+# Worker Models
+class CreateWorkerRequest(BaseModel):
+    mobile_numbers: str
+    name: str
+    department: str
+
+class UpdateWorkerRequest(BaseModel):
+    name: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class Worker(BaseModel):
+    worker_id: str
+    mobile_numbers: str
+    name: str
+    department: str
+    admin_id: str
+    created_at: str
+    is_active: bool
+
+class CreateWorkerResponse(BaseModel):
+    success: bool
+    worker_id: str
+    message: str
+
+class GetWorkerResponse(BaseModel):
+    success: bool
+    worker: Worker
+
+class GetWorkersResponse(BaseModel):
+    success: bool
+    workers: List[Worker]
+
+class UpdateWorkerResponse(BaseModel):
+    success: bool
+    message: str
+
+class DeleteWorkerResponse(BaseModel):
+    success: bool
+    message: str
 
 # ============================================================================
 # UTILITY FUNCTIONS - OTP & EMAIL
@@ -1116,6 +1158,15 @@ async def home():
         <li>POST /logout - Admin logout (requires auth)</li>
         <li>GET /get-active-calls - Get active calls from Firebase (requires auth)</li>
         <li>GET /health/redis - Check Redis connection</li>
+    </ul>
+    
+    <h2>Worker Management Endpoints:</h2>
+    <ul>
+        <li>POST /api/workers - Create a new worker (requires auth)</li>
+        <li>GET /api/workers - Get all workers for admin (requires auth)</li>
+        <li>GET /api/workers/{worker_id} - Get specific worker (requires auth)</li>
+        <li>PUT /api/workers/{worker_id} - Update worker information (requires auth)</li>
+        <li>DELETE /api/workers/{worker_id} - Delete a worker (requires auth)</li>
     </ul>
     
     <h2>Documentation:</h2>
@@ -2335,6 +2386,268 @@ async def stream_conversation(
             }
     
     return EventSourceResponse(event_generator())
+
+# ============================================================================
+# WORKER ENDPOINTS
+# ============================================================================
+
+@app.post("/api/workers", response_model=CreateWorkerResponse, status_code=status.HTTP_201_CREATED)
+async def create_worker(
+    request: CreateWorkerRequest,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """Create a new worker in the system"""
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Clean mobile number: remove spaces, +, and any special characters
+        clean_mobile = request.mobile_numbers.replace('+', '').replace('-', '').replace(' ', '')
+        
+        # Validate mobile number (should be digits only)
+        if not clean_mobile.isdigit():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mobile number must contain only digits"
+            )
+        
+        # Generate worker_id in format: worker_mobileno
+        worker_id = f"worker_{clean_mobile}"
+        
+        # Check if worker already exists
+        worker_ref = firestore_db.collection('workers').document(worker_id)
+        if worker_ref.get().exists:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Worker with mobile number {request.mobile_numbers} already exists"
+            )
+        
+        # Create worker document
+        worker_data = {
+            "mobile_numbers": request.mobile_numbers,
+            "name": request.name,
+            "department": request.department,
+            "admin_id": admin_id,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "is_active": True
+        }
+        
+        worker_ref.set(worker_data)
+        
+        print(f"✅ Worker created: {worker_id}")
+        
+        return CreateWorkerResponse(
+            success=True,
+            worker_id=worker_id,
+            message="Worker created successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error creating worker: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating worker: {str(e)}"
+        )
+
+@app.get("/api/workers", response_model=GetWorkersResponse, status_code=status.HTTP_200_OK)
+async def get_workers(
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """Get all workers for the authenticated admin"""
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Query workers by admin_id
+        workers_ref = firestore_db.collection('workers')
+        query = workers_ref.where('admin_id', '==', admin_id).stream()
+        
+        workers = []
+        for doc in query:
+            worker_data = doc.to_dict()
+            workers.append(Worker(
+                worker_id=doc.id,
+                mobile_numbers=worker_data.get('mobile_numbers', ''),
+                name=worker_data.get('name', ''),
+                department=worker_data.get('department', ''),
+                admin_id=worker_data.get('admin_id', ''),
+                created_at=convert_timestamp(worker_data.get('created_at')),
+                is_active=worker_data.get('is_active', True)
+            ))
+        
+        return GetWorkersResponse(
+            success=True,
+            workers=workers
+        )
+        
+    except Exception as e:
+        print(f"❌ Error fetching workers: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching workers: {str(e)}"
+        )
+
+@app.get("/api/workers/{worker_id}", response_model=GetWorkerResponse, status_code=status.HTTP_200_OK)
+async def get_worker(
+    worker_id: str,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """Get a specific worker by ID"""
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get worker document
+        worker_ref = firestore_db.collection('workers').document(worker_id)
+        worker_doc = worker_ref.get()
+        
+        if not worker_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Worker with ID {worker_id} not found"
+            )
+        
+        worker_data = worker_doc.to_dict()
+        
+        # Verify worker belongs to this admin
+        if worker_data.get('admin_id') != admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this worker"
+            )
+        
+        worker = Worker(
+            worker_id=worker_doc.id,
+            mobile_numbers=worker_data.get('mobile_numbers', ''),
+            name=worker_data.get('name', ''),
+            department=worker_data.get('department', ''),
+            admin_id=worker_data.get('admin_id', ''),
+            created_at=convert_timestamp(worker_data.get('created_at')),
+            is_active=worker_data.get('is_active', True)
+        )
+        
+        return GetWorkerResponse(
+            success=True,
+            worker=worker
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching worker: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching worker: {str(e)}"
+        )
+
+@app.put("/api/workers/{worker_id}", response_model=UpdateWorkerResponse, status_code=status.HTTP_200_OK)
+async def update_worker(
+    worker_id: str,
+    request: UpdateWorkerRequest,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """Update a worker's information"""
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get worker document
+        worker_ref = firestore_db.collection('workers').document(worker_id)
+        worker_doc = worker_ref.get()
+        
+        if not worker_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Worker with ID {worker_id} not found"
+            )
+        
+        worker_data = worker_doc.to_dict()
+        
+        # Verify worker belongs to this admin
+        if worker_data.get('admin_id') != admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to update this worker"
+            )
+        
+        # Build update data (only include fields that are provided)
+        update_data = {}
+        if request.name is not None:
+            update_data['name'] = request.name
+        if request.department is not None:
+            update_data['department'] = request.department
+        if request.is_active is not None:
+            update_data['is_active'] = request.is_active
+        
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update"
+            )
+        
+        # Update worker document
+        worker_ref.update(update_data)
+        
+        print(f"✅ Worker updated: {worker_id}")
+        
+        return UpdateWorkerResponse(
+            success=True,
+            message="Worker updated successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating worker: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating worker: {str(e)}"
+        )
+
+@app.delete("/api/workers/{worker_id}", response_model=DeleteWorkerResponse, status_code=status.HTTP_200_OK)
+async def delete_worker(
+    worker_id: str,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """Delete a worker from the system"""
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get worker document
+        worker_ref = firestore_db.collection('workers').document(worker_id)
+        worker_doc = worker_ref.get()
+        
+        if not worker_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Worker with ID {worker_id} not found"
+            )
+        
+        worker_data = worker_doc.to_dict()
+        
+        # Verify worker belongs to this admin
+        if worker_data.get('admin_id') != admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this worker"
+            )
+        
+        # Delete worker document
+        worker_ref.delete()
+        
+        print(f"✅ Worker deleted: {worker_id}")
+        
+        return DeleteWorkerResponse(
+            success=True,
+            message="Worker deleted successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting worker: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting worker: {str(e)}"
+        )
 
 # ============================================================================
 # STARTUP EVENT

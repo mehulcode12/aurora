@@ -57,7 +57,7 @@ active_conversations/
 **workers/** (Collection)
 ```
 {worker_id}/ (Document)
-  mobile_numbers: ["string"]
+  mobile_numbers: "string"
   name: "string"
   department: "string"
   admin_id: "string" (reference to admin)
@@ -90,6 +90,7 @@ active_conversations/
     {
       role: "user" | "assistant",
       content: "string",
+      sources: "string",
       timestamp: timestamp
     }
   ]
