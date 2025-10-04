@@ -16,6 +16,7 @@ Setup Instructions:
 from fastapi import FastAPI, Form, Request, HTTPException, status, Depends, File, UploadFile, Header
 from fastapi.responses import Response, JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.rest import Client
@@ -55,7 +56,14 @@ app = FastAPI(
     description="AI-powered emergency assistance with phone calls and admin management",
     version="3.0.0"
 )
-
+# Allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # <-- all allowed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 security = HTTPBearer()
 
 # ============================================================================
