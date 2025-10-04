@@ -1,0 +1,40 @@
+{
+  "call_sid": "CA68ec7c78129f8ce470a5f0f6ca8a9a84",
+  "duration_seconds": 74,
+  "exchanges": 4,
+  "critical_alerts": 4,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My leg is broken. I fallen from the floor. What should I do?"
+    },
+    {
+      "role": "assistant",
+      "content": "Call the on-site medical staff immediately. They are located near the lobby, next to the elevator. If you can't move, ask someone to call for you."
+    },
+    {
+      "role": "user",
+      "content": "Okay, sure. I will do that. Thank you."
+    },
+    {
+      "role": "assistant",
+      "content": "Stay calm and still, help will arrive soon. Did you understand? Say yes or no."
+    },
+    {
+      "role": "user",
+      "content": "Yes, I understand."
+    },
+    {
+      "role": "assistant",
+      "content": "Remember to inform the medical staff about your injury, they will guide you further. You can reach them at extension 1234. Did you understand? Say yes or no."
+    },
+    {
+      "role": "user",
+      "content": "Yes, I understand."
+    },
+    {
+      "role": "assistant",
+      "content": ""
+    }
+  ]
+}

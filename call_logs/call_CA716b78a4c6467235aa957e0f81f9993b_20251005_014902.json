@@ -1,0 +1,24 @@
+{
+  "call_sid": "CA716b78a4c6467235aa957e0f81f9993b",
+  "duration_seconds": 45,
+  "exchanges": 2,
+  "critical_alerts": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My leg is broken. What should I do?"
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    },
+    {
+      "role": "user",
+      "content": "Okay, sure."
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    }
+  ]
+}

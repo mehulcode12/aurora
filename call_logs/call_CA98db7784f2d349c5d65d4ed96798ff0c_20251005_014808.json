@@ -1,0 +1,32 @@
+{
+  "call_sid": "CA98db7784f2d349c5d65d4ed96798ff0c",
+  "duration_seconds": 51,
+  "exchanges": 3,
+  "critical_alerts": 3,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "There is a pain in my chest. What should I do?"
+    },
+    {
+      "role": "assistant",
+      "content": "Call the emergency number now. If you are in the office, please go to the first aid kit located in the break room."
+    },
+    {
+      "role": "user",
+      "content": "Yes, I am in the office. Where is the break room?"
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    },
+    {
+      "role": "user",
+      "content": "Okay, sure."
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    }
+  ]
+}

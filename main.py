@@ -4,7 +4,7 @@ Combines phone call integration (Twilio) with admin authentication and managemen
 
 Requirements:
 pip install fastapi uvicorn twilio cerebras_cloud_sdk python-dotenv python-multipart
-pip install redis firebase-admin jose groq PyPDF2 pdfplumber python-docx requests
+pip install redis firebase-admin jose PyPDF2 pdfplumber python-docx requests
 
 Setup Instructions:
 1. Create .env file with all required credentials
@@ -23,7 +23,6 @@ from twilio.rest import Client
 from cerebras.cloud.sdk import Cerebras
 from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
-from groq import Groq
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from typing import List, Optional, Dict, Any
@@ -54,7 +53,7 @@ app = FastAPI(
     description="AI-powered emergency assistance with phone calls and admin management",
     version="3.0.0"
 )
-# Allow all origins
+# CORS: Allow all origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # <-- all allowed
@@ -101,9 +100,6 @@ class Config:
     # Cerebras settings
     CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
     CEREBRAS_MODEL = "llama-3.3-70b"
-    
-    # Groq settings
-    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     
     # Voice settings
     TTS_VOICE = "Polly.Amy"
@@ -159,10 +155,6 @@ except redis.ConnectionError:
     print("Run Redis Server > cd C:\\Redis-x64-3.0.504 && redis-server.exe redis.windows.conf")
     print("---------------------------------------------------------------------------------\n")
 
-# ============================================================================
-# GROQ CLIENT INITIALIZATION
-# ============================================================================
-groq_client = Groq(api_key=config.GROQ_API_KEY)
 
 # ============================================================================
 # ACTIVE CALLS MANAGER
@@ -228,11 +220,25 @@ class ActiveCallsManager:
         try:
             data = self._load_data()
             
+            # Check for existing ACTIVE call for this phone number
             existing_call_id = None
             for call_id, call_data in data["active_calls"].items():
                 if call_data["mobile_no"] == phone_number and call_data["status"] == "ACTIVE":
                     existing_call_id = call_id
                     break
+            
+            # Also check Firebase Realtime DB to ensure call still exists there
+            if existing_call_id:
+                # Verify the call actually exists in Firebase RT DB
+                try:
+                    fb_call = db.reference(f'active_calls/{existing_call_id}').get()
+                    if not fb_call:
+                        # Call was archived, create new one
+                        print(f"⚠️ Call {existing_call_id} was archived, creating new call")
+                        existing_call_id = None
+                except Exception as e:
+                    print(f"⚠️ Error checking Firebase for call: {e}")
+                    existing_call_id = None
             
             if existing_call_id:
                 call_id = existing_call_id
@@ -279,8 +285,13 @@ class ActiveCallsManager:
             data["active_calls"][call_id]["urgency"] = urgency_level.upper()
             data["active_calls"][call_id]["last_message_at"] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
             
+            # Save to local JSON first (fast, synchronous)
             if self._save_data(data):
-                print(f"📝 Conversation updated for {phone_number}: {call_id}")
+                print(f"📝 Conversation updated locally for {phone_number}: {call_id}")
+                
+                # Update Firebase Realtime Database asynchronously (non-blocking)
+                self._update_firebase_async(call_id, conv_id, data["active_calls"][call_id], conv_data)
+                
                 return call_id, conv_id
             else:
                 return None, None
@@ -288,6 +299,33 @@ class ActiveCallsManager:
         except Exception as e:
             print(f"❌ Error updating conversation: {e}")
             return None, None
+    
+    def _update_firebase_async(self, call_id, conv_id, call_data, conv_data):
+        """Update Firebase Realtime Database asynchronously without blocking"""
+        try:
+            # Use threading to avoid blocking the main conversation flow
+            import threading
+            
+            def firebase_update():
+                try:
+                    # Update active_calls in Firebase
+                    active_calls_ref = db.reference(f'active_calls/{call_id}')
+                    active_calls_ref.set(call_data)
+                    
+                    # Update active_conversations in Firebase
+                    active_conversations_ref = db.reference(f'active_conversations/{conv_id}')
+                    active_conversations_ref.set(conv_data)
+                    
+                    print(f"🔥 Firebase updated successfully for {call_id}")
+                except Exception as e:
+                    print(f"⚠️ Firebase update error (non-critical): {e}")
+            
+            # Start Firebase update in background thread
+            thread = threading.Thread(target=firebase_update, daemon=True)
+            thread.start()
+            
+        except Exception as e:
+            print(f"⚠️ Error starting Firebase update thread: {e}")
     
     def get_all_data(self):
         """Get all active calls and conversations data"""
@@ -311,17 +349,127 @@ class ActiveCallsManager:
             print(f"❌ Error getting call data: {e}")
             return None
     
+    def find_active_call_by_phone(self, phone_number):
+        """Find active call ID by phone number"""
+        try:
+            data = self._load_data()
+            for call_id, call_data in data["active_calls"].items():
+                if call_data["mobile_no"] == phone_number and call_data["status"] == "ACTIVE":
+                    return call_id
+            return None
+        except Exception as e:
+            print(f"❌ Error finding call by phone: {e}")
+            return None
+    
     def end_call(self, call_id):
-        """Mark a call as ended"""
+        """Mark a call as ended and archive to Firestore"""
         try:
             data = self._load_data()
             if call_id in data["active_calls"]:
+                call_data = data["active_calls"][call_id]
+                conv_id = call_data["conversation_id"]
+                conv_data = data["active_conversations"].get(conv_id, {})
+                
+                # Mark as ended in local JSON
                 data["active_calls"][call_id]["status"] = "ENDED"
-                return self._save_data(data)
+                
+                # Save to local JSON
+                if self._save_data(data):
+                    # Archive to Firestore and cleanup Firebase Realtime DB asynchronously
+                    import threading
+                    
+                    def archive_and_cleanup():
+                        try:
+                            # Step 1: Archive call to Firestore calls/ collection
+                            self._archive_call_to_firestore(call_id, call_data, conv_data)
+                            
+                            # Step 2: Archive conversation to Firestore conversations/ collection
+                            self._archive_conversation_to_firestore(conv_id, call_id, conv_data)
+                            
+                            # Step 3: Remove from Firebase Realtime Database
+                            db.reference(f'active_calls/{call_id}').delete()
+                            db.reference(f'active_conversations/{conv_id}').delete()
+                            
+                            # Step 4: Clean up local JSON (remove from active_calls and active_conversations)
+                            local_data = self._load_data()
+                            if call_id in local_data["active_calls"]:
+                                del local_data["active_calls"][call_id]
+                            if conv_id in local_data["active_conversations"]:
+                                del local_data["active_conversations"][conv_id]
+                            self._save_data(local_data)
+                            
+                            print(f"✅ Call {call_id} archived to Firestore and removed from active calls")
+                        except Exception as e:
+                            print(f"⚠️ Firebase archive error: {e}")
+                    
+                    thread = threading.Thread(target=archive_and_cleanup, daemon=True)
+                    thread.start()
+                    
+                    return True
             return False
         except Exception as e:
             print(f"❌ Error ending call: {e}")
             return False
+    
+    def _archive_call_to_firestore(self, call_id, call_data, conv_data):
+        """Archive call to Firestore calls/ collection following schema"""
+        try:
+            # Calculate duration if possible
+            start_time = datetime.fromisoformat(call_data["timestamp"].replace('+05:30', ''))
+            end_time = datetime.now()
+            duration_seconds = int((end_time - start_time).total_seconds())
+            
+            # Prepare call document following Firestore schema
+            call_doc = {
+                "worker_id": call_data.get("worker_id", ""),
+                "mobile_no": call_data.get("mobile_no", ""),
+                "conversation_id": call_data.get("conversation_id", ""),
+                "urgency": call_data.get("urgency", "NORMAL"),
+                "status": "COMPLETE",  # As per schema: "COMPLETE" | "TAKEOVER"
+                "timestamp": firestore.SERVER_TIMESTAMP,
+                "medium": call_data.get("medium", "Voice"),
+                "final_action": None,  # Can be updated if action was taken
+                "admin_id": call_data.get("admin_id"),  # If taken over
+                "resolved_at": firestore.SERVER_TIMESTAMP,
+                "duration_seconds": duration_seconds,
+                "admin_notes": ""  # Can be added by admin
+            }
+            
+            # Save to Firestore calls/ collection
+            firestore_db.collection('calls').document(call_id).set(call_doc)
+            print(f"📦 Call {call_id} archived to Firestore calls/ collection")
+            
+        except Exception as e:
+            print(f"❌ Error archiving call to Firestore: {e}")
+    
+    def _archive_conversation_to_firestore(self, conv_id, call_id, conv_data):
+        """Archive conversation to Firestore conversations/ collection following schema"""
+        try:
+            # Extract messages from conversation data
+            messages = []
+            messages_dict = conv_data.get("messages", {})
+            
+            for msg_id, msg_data in sorted(messages_dict.items()):
+                messages.append({
+                    "role": msg_data.get("role", "user"),
+                    "content": msg_data.get("content", ""),
+                    "timestamp": msg_data.get("timestamp", "")
+                })
+            
+            # Prepare conversation document following Firestore schema
+            conversation_doc = {
+                "call_id": call_id,
+                "messages": messages,
+                "archived_at": firestore.SERVER_TIMESTAMP,
+                "total_messages": len(messages)
+            }
+            
+            # Save to Firestore conversations/ collection
+            firestore_db.collection('conversations').document(conv_id).set(conversation_doc)
+            print(f"💬 Conversation {conv_id} archived to Firestore conversations/ collection")
+            
+        except Exception as e:
+            print(f"❌ Error archiving conversation to Firestore: {e}")
 
 # ============================================================================
 # CONVERSATION MANAGER
@@ -915,8 +1063,8 @@ def extract_text_from_txt(file_content: bytes) -> str:
         print(f"Error extracting TXT: {str(e)}")
         return ""
 
-async def process_files_with_groq(files: List[UploadFile]) -> str:
-    """Extract and process content from multiple files using Groq API"""
+async def process_files(files: List[UploadFile]) -> str:
+    """Extract and process content from multiple files"""
     all_text = ""
     
     for file in files:
@@ -1166,6 +1314,9 @@ async def process_speech(
         )
         response.hangup()
         
+        # Note: Archival happens via /call-status webhook when call actually ends
+        # Do NOT archive here - this runs on every message exchange!
+        
         return Response(content=str(response), media_type="application/xml")
         
     except Exception as e:
@@ -1266,26 +1417,46 @@ async def end_call_endpoint(call_id: str):
 @app.post("/call-status")
 async def call_status(
     CallSid: str = Form(...),
-    CallStatus: str = Form(...)
+    CallStatus: str = Form(...),
+    From: str = Form(None)
 ):
     """Handle call status updates (completed, failed, etc.)"""
     print(f"\n📊 CALL STATUS UPDATE")
-    print(f"   Call: {CallSid}")
+    print(f"   Call SID: {CallSid}")
     print(f"   Status: {CallStatus}")
+    print(f"   From: {From}")
     
     if CallStatus in ['completed', 'failed', 'busy', 'no-answer']:
+        # End conversation in memory
         summary = conversation_manager.end_conversation(CallSid)
         if summary:
             print(f"   Duration: {summary['duration_seconds']}s")
             print(f"   Exchanges: {summary['exchanges']}")
             print(f"   Critical Alerts: {summary['critical_alerts']}")
+        
+        # Find and archive the call from active_calls_manager
+        if From:
+            call_id = active_calls_manager.find_active_call_by_phone(From)
+            if call_id:
+                print(f"   📦 Archiving call {call_id} to Firestore...")
+                active_calls_manager.end_call(call_id)
+            else:
+                print(f"   ⚠️ No active call found for {From}")
     
     return Response(content='', status_code=200)
 
 @app.post("/hangup")
-async def hangup(CallSid: str = Form(...)):
+async def hangup(CallSid: str = Form(...), From: str = Form(None)):
     """Handle explicit hangup"""
+    # End conversation in memory
     conversation_manager.end_conversation(CallSid)
+    
+    # Find and archive the call
+    if From:
+        call_id = active_calls_manager.find_active_call_by_phone(From)
+        if call_id:
+            print(f"📦 Archiving call {call_id} after explicit hangup")
+            active_calls_manager.end_call(call_id)
     
     response = VoiceResponse()
     response.say("Goodbye. Stay safe.", voice=config.TTS_VOICE, rate=config.SPEECH_RATE)
@@ -1663,7 +1834,7 @@ async def sign_up(
                 detail="Admin already exists"
             )
         
-        processed_content = await process_files_with_groq(files)
+        processed_content = await process_files(files)
         
         sops_ref = firestore_db.collection('sops_manuals')
         sop_doc_ref = sops_ref.add({
@@ -2185,12 +2356,6 @@ async def startup_event():
         missing.append("TWILIO_AUTH_TOKEN")
     if not config.TWILIO_PHONE_NUMBER:
         missing.append("TWILIO_PHONE_NUMBER")
-    if not config.GROQ_API_KEY:
-        missing.append("GROQ_API_KEY")
-    # if not config.SMTP_EMAIL:
-    #     missing.append("SMTP_EMAIL")
-    # if not config.SMTP_PASSWORD:
-    #     missing.append("SMTP_PASSWORD")
     if not FIREBASE_WEB_API_KEY:
         missing.append("FIREBASE_WEB_API_KEY")
     
@@ -2204,7 +2369,6 @@ async def startup_event():
         print(f"✅ Twilio Account: {config.TWILIO_ACCOUNT_SID[:10]}...")
         print(f"✅ Phone Number: {config.TWILIO_PHONE_NUMBER}")
         print(f"✅ Cerebras API: Connected")
-        print(f"✅ Groq API: Connected")
         print(f"✅ Firebase: Connected")
         # print(f"✅ SMTP Email: {config.SMTP_EMAIL}")
     
