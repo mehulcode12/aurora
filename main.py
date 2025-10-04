@@ -2187,10 +2187,10 @@ async def startup_event():
         missing.append("TWILIO_PHONE_NUMBER")
     if not config.GROQ_API_KEY:
         missing.append("GROQ_API_KEY")
-    if not config.SMTP_EMAIL:
-        missing.append("SMTP_EMAIL")
-    if not config.SMTP_PASSWORD:
-        missing.append("SMTP_PASSWORD")
+    # if not config.SMTP_EMAIL:
+    #     missing.append("SMTP_EMAIL")
+    # if not config.SMTP_PASSWORD:
+    #     missing.append("SMTP_PASSWORD")
     if not FIREBASE_WEB_API_KEY:
         missing.append("FIREBASE_WEB_API_KEY")
     
@@ -2206,7 +2206,7 @@ async def startup_event():
         print(f"✅ Cerebras API: Connected")
         print(f"✅ Groq API: Connected")
         print(f"✅ Firebase: Connected")
-        print(f"✅ SMTP Email: {config.SMTP_EMAIL}")
+        # print(f"✅ SMTP Email: {config.SMTP_EMAIL}")
     
     os.makedirs("call_logs", exist_ok=True)
     
