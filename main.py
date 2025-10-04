@@ -827,6 +827,54 @@ class DeleteWorkerResponse(BaseModel):
     success: bool
     message: str
 
+# Call History Models
+class CallHistory(BaseModel):
+    call_id: str
+    worker_id: str
+    mobile_no: str
+    conversation_id: str
+    urgency: str
+    status: str
+    timestamp: str
+    medium: str
+    final_action: Optional[str] = None
+    admin_id: Optional[str] = None
+    resolved_at: str
+    duration_seconds: Optional[int] = None
+    admin_notes: Optional[str] = None
+
+class GetCallsHistoryResponse(BaseModel):
+    success: bool
+    calls: List[CallHistory]
+    total_calls: int
+
+class ConversationHistoryMessage(BaseModel):
+    role: str
+    content: str
+    sources: Optional[str] = None
+    timestamp: str
+
+class ConversationHistory(BaseModel):
+    conversation_id: str
+    call_id: str
+    messages: List[ConversationHistoryMessage]
+    archived_at: str
+    total_messages: int
+
+class GetConversationHistoryResponse(BaseModel):
+    success: bool
+    conversation: ConversationHistory
+
+# Admin Update Models
+class UpdateAdminRequest(BaseModel):
+    name: Optional[str] = None
+    designation: Optional[str] = None
+
+class UpdateAdminResponse(BaseModel):
+    success: bool
+    message: str
+    admin: AdminProfile
+
 # ============================================================================
 # UTILITY FUNCTIONS - OTP & EMAIL
 # ============================================================================
@@ -1167,6 +1215,18 @@ async def home():
         <li>GET /api/workers/{worker_id} - Get specific worker (requires auth)</li>
         <li>PUT /api/workers/{worker_id} - Update worker information (requires auth)</li>
         <li>DELETE /api/workers/{worker_id} - Delete a worker (requires auth)</li>
+    </ul>
+    
+    <h2>Call History Endpoints:</h2>
+    <ul>
+        <li>GET /api/calls/history - Get all completed calls for admin (requires auth)</li>
+        <li>GET /api/calls/{call_id}/conversation - Get conversation for specific call (requires auth)</li>
+    </ul>
+    
+    <h2>Admin Profile Endpoints:</h2>
+    <ul>
+        <li>GET /api/admin/profile - Get admin profile information (requires auth)</li>
+        <li>PUT /api/admin/profile - Update admin profile (requires auth)</li>
     </ul>
     
     <h2>Documentation:</h2>
@@ -2647,6 +2707,288 @@ async def delete_worker(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting worker: {str(e)}"
+        )
+
+# ============================================================================
+# CALL HISTORY ENDPOINTS
+# ============================================================================
+
+@app.get("/api/calls/history", response_model=GetCallsHistoryResponse, status_code=status.HTTP_200_OK)
+async def get_calls_history(
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Get all completed/archived calls for the authenticated admin from Firestore
+    
+    Returns calls that belong to workers under this admin's management
+    """
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get all workers for this admin to find their worker_ids
+        workers_ref = firestore_db.collection('workers')
+        workers_query = workers_ref.where('admin_id', '==', admin_id).stream()
+        worker_ids = [worker.id for worker in workers_query]
+        
+        if not worker_ids:
+            # No workers, return empty list
+            return GetCallsHistoryResponse(
+                success=True,
+                calls=[],
+                total_calls=0
+            )
+        
+        # Query calls collection for calls from these workers
+        calls_ref = firestore_db.collection('calls')
+        all_calls = []
+        
+        # Firestore 'in' query supports max 10 items, so we batch if needed
+        batch_size = 10
+        for i in range(0, len(worker_ids), batch_size):
+            batch_worker_ids = worker_ids[i:i+batch_size]
+            calls_query = calls_ref.where('worker_id', 'in', batch_worker_ids).stream()
+            
+            for doc in calls_query:
+                call_data = doc.to_dict()
+                all_calls.append(CallHistory(
+                    call_id=doc.id,
+                    worker_id=call_data.get('worker_id', ''),
+                    mobile_no=call_data.get('mobile_no', ''),
+                    conversation_id=call_data.get('conversation_id', ''),
+                    urgency=call_data.get('urgency', 'NORMAL'),
+                    status=call_data.get('status', 'COMPLETE'),
+                    timestamp=convert_timestamp(call_data.get('timestamp')),
+                    medium=call_data.get('medium', 'Voice'),
+                    final_action=call_data.get('final_action'),
+                    admin_id=call_data.get('admin_id'),
+                    resolved_at=convert_timestamp(call_data.get('resolved_at')),
+                    duration_seconds=call_data.get('duration_seconds'),
+                    admin_notes=call_data.get('admin_notes', '')
+                ))
+        
+        # Sort by timestamp (most recent first)
+        all_calls.sort(key=lambda x: x.timestamp, reverse=True)
+        
+        print(f"✅ Retrieved {len(all_calls)} call history records for admin {admin_id}")
+        
+        return GetCallsHistoryResponse(
+            success=True,
+            calls=all_calls,
+            total_calls=len(all_calls)
+        )
+        
+    except Exception as e:
+        print(f"❌ Error fetching call history: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching call history: {str(e)}"
+        )
+
+@app.get("/api/calls/{call_id}/conversation", response_model=GetConversationHistoryResponse, status_code=status.HTTP_200_OK)
+async def get_call_conversation_history(
+    call_id: str,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Get conversation history for a specific call from Firestore
+    
+    Retrieves the archived conversation from Firestore conversations/ collection
+    """
+    try:
+        admin_id = token_data['admin_id']
+        
+        # First, verify the call belongs to this admin
+        call_ref = firestore_db.collection('calls').document(call_id)
+        call_doc = call_ref.get()
+        
+        if not call_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Call with ID {call_id} not found"
+            )
+        
+        call_data = call_doc.to_dict()
+        worker_id = call_data.get('worker_id', '')
+        
+        # Verify worker belongs to this admin
+        if worker_id:
+            worker_ref = firestore_db.collection('workers').document(worker_id)
+            worker_doc = worker_ref.get()
+            
+            if worker_doc.exists:
+                worker_data = worker_doc.to_dict()
+                if worker_data.get('admin_id') != admin_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="You don't have permission to access this call"
+                    )
+        
+        # Get conversation from Firestore
+        conversation_id = call_data.get('conversation_id', '')
+        
+        if not conversation_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation ID not found for this call"
+            )
+        
+        conversation_ref = firestore_db.collection('conversations').document(conversation_id)
+        conversation_doc = conversation_ref.get()
+        
+        if not conversation_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation with ID {conversation_id} not found"
+            )
+        
+        conversation_data = conversation_doc.to_dict()
+        
+        # Parse messages
+        messages = []
+        for msg in conversation_data.get('messages', []):
+            messages.append(ConversationHistoryMessage(
+                role=msg.get('role', 'user'),
+                content=msg.get('content', ''),
+                sources=msg.get('sources', ''),
+                timestamp=convert_timestamp(msg.get('timestamp'))
+            ))
+        
+        conversation = ConversationHistory(
+            conversation_id=conversation_doc.id,
+            call_id=conversation_data.get('call_id', call_id),
+            messages=messages,
+            archived_at=convert_timestamp(conversation_data.get('archived_at')),
+            total_messages=conversation_data.get('total_messages', len(messages))
+        )
+        
+        print(f"✅ Retrieved conversation {conversation_id} for call {call_id}")
+        
+        return GetConversationHistoryResponse(
+            success=True,
+            conversation=conversation
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching conversation history: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching conversation history: {str(e)}"
+        )
+
+# ============================================================================
+# ADMIN PROFILE ENDPOINTS
+# ============================================================================
+
+@app.put("/api/admin/profile", response_model=UpdateAdminResponse, status_code=status.HTTP_200_OK)
+async def update_admin_profile(
+    request: UpdateAdminRequest,
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Update admin profile information
+    
+    Allows admin to update their name and designation
+    Email and company_name cannot be changed
+    """
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get admin document
+        admin_ref = firestore_db.collection('admins').document(admin_id)
+        admin_doc = admin_ref.get()
+        
+        if not admin_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Admin profile not found"
+            )
+        
+        admin_data = admin_doc.to_dict()
+        
+        # Build update data (only include fields that are provided)
+        update_data = {}
+        if request.name is not None:
+            update_data['name'] = request.name
+        if request.designation is not None:
+            update_data['designation'] = request.designation
+        
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update"
+            )
+        
+        # Update admin document
+        admin_ref.update(update_data)
+        
+        # Get updated admin data
+        updated_admin_doc = admin_ref.get()
+        updated_admin_data = updated_admin_doc.to_dict()
+        
+        print(f"✅ Admin profile updated: {admin_id}")
+        
+        admin_profile = AdminProfile(
+            admin_id=admin_id,
+            email=updated_admin_data.get('email', ''),
+            name=updated_admin_data.get('name', ''),
+            company_name=updated_admin_data.get('company_name', ''),
+            designation=updated_admin_data.get('designation', '')
+        )
+        
+        return UpdateAdminResponse(
+            success=True,
+            message="Admin profile updated successfully",
+            admin=admin_profile
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating admin profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating admin profile: {str(e)}"
+        )
+
+@app.get("/api/admin/profile", response_model=AdminProfile, status_code=status.HTTP_200_OK)
+async def get_admin_profile(
+    token_data: dict = Depends(verify_access_token_with_blacklist)
+):
+    """
+    Get current admin profile information
+    """
+    try:
+        admin_id = token_data['admin_id']
+        
+        # Get admin document
+        admin_ref = firestore_db.collection('admins').document(admin_id)
+        admin_doc = admin_ref.get()
+        
+        if not admin_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Admin profile not found"
+            )
+        
+        admin_data = admin_doc.to_dict()
+        
+        return AdminProfile(
+            admin_id=admin_id,
+            email=admin_data.get('email', ''),
+            name=admin_data.get('name', ''),
+            company_name=admin_data.get('company_name', ''),
+            designation=admin_data.get('designation', '')
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching admin profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching admin profile: {str(e)}"
         )
 
 # ============================================================================

@@ -1,0 +1,24 @@
+{
+  "call_sid": "CA4e6837bdc3a37132ad9aab6909e6a517",
+  "duration_seconds": 44,
+  "exchanges": 2,
+  "critical_alerts": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Actually, there is strong smell of gas in chamber to what should I do?"
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    },
+    {
+      "role": "user",
+      "content": "What is error?"
+    },
+    {
+      "role": "assistant",
+      "content": "Emergency system error. Please call your supervisor at extension 9999 immediately."
+    }
+  ]
+}
