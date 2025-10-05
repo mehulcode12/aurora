@@ -1,4 +1,33 @@
 {
-  "active_calls": {},
-  "active_conversations": {}
+  "active_calls": {
+    "call_telegram_1993128326_20251006_030211": {
+      "worker_id": "worker_telegram1993128326",
+      "mobile_no": "telegram_1993128326",
+      "conversation_id": "conv_telegram_1993128326_20251006_030211",
+      "urgency": "NORMAL",
+      "status": "ACTIVE",
+      "timestamp": "2025-10-06T03:02:11+05:30",
+      "medium": "Text",
+      "last_message_at": "2025-10-06T03:02:11+05:30"
+    }
+  },
+  "active_conversations": {
+    "conv_telegram_1993128326_20251006_030211": {
+      "call_id": "call_telegram_1993128326_20251006_030211",
+      "messages": {
+        "msg_telegram_1993128326_20251006_030211_0001": {
+          "role": "user",
+          "content": "what is CNC machine",
+          "timestamp": "2025-10-06T03:02:11+05:30",
+          "sources": ""
+        },
+        "msg_telegram_1993128326_20251006_030211_0002": {
+          "role": "assistant",
+          "content": "A CNC machine is a Computer Numerical Control machine. It's a type of machine that uses computers to control its movements. \n\nTo operate a CNC machine, follow these steps: \n1. Load the program into the machine's computer. \n2. Check the machine's settings and tools. \n3. Start the machine and monitor its operation. \n\nRemember to always follow safety protocols when working with CNC machines.",
+          "timestamp": "2025-10-06T03:02:11+05:30",
+          "sources": "Equipment Manual, Safety Training Materials"
+        }
+      }
+    }
+  }
 }

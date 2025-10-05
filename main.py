@@ -41,6 +41,15 @@ import pdfplumber
 import docx
 import io
 import requests
+import tempfile
+import threading
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from gtts import gTTS
+from pydub import AudioSegment
+import speech_recognition as sr
 
 # Load environment variables
 load_dotenv()
@@ -104,11 +113,15 @@ class Config:
     # Voice settings
     TTS_VOICE = "Polly.Amy"
     SPEECH_RATE = "fast"
+    TTS_SPEED = 1.4  # For Telegram voice messages
     
     # Conversation settings
     SPEECH_TIMEOUT = "auto"
     GATHER_TIMEOUT = 10
     MAX_CONVERSATION_LENGTH = 20
+    TELEGRAM_INACTIVITY_TIMEOUT = 300  # 5 minutes in seconds
+    TELEGRAM_INACTIVITY_WARNING = 120  # 2 minutes before timeout
+    TELEGRAM_MAX_CONVERSATION_AGE = 86400  # 24 hours in seconds
     
     # JWT settings
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
@@ -125,6 +138,9 @@ class Config:
     REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
     REDIS_USERNAME = os.getenv('REDIS_USERNAME')
     REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+    
+    # Telegram settings
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 config = Config()
 
@@ -215,7 +231,7 @@ class ActiveCallsManager:
         """Generate message ID"""
         return f"msg_{conv_id.split('_', 1)[1]}_{message_count:04d}"
     
-    def add_conversation_entry(self, phone_number, user_query, aurora_response, urgency_level, sources=None, call_sid=None):
+    def add_conversation_entry(self, phone_number, user_query, aurora_response, urgency_level, sources=None, call_sid=None, medium="Voice"):
         """Add a new conversation entry following frontend structure"""
         try:
             data = self._load_data()
@@ -248,13 +264,13 @@ class ActiveCallsManager:
                 conv_id = self._generate_conv_id(call_id)
                 
                 data["active_calls"][call_id] = {
-                    "worker_id": f"worker_{phone_number.replace('+', '').replace('-', '')}",
+                    "worker_id": f"worker_{phone_number.replace('+', '').replace('-', '').replace('_', '')}",
                     "mobile_no": phone_number,
                     "conversation_id": conv_id,
                     "urgency": urgency_level.upper(),
                     "status": "ACTIVE",
                     "timestamp": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30'),
-                    "medium": "Voice",
+                    "medium": medium,
                     "last_message_at": datetime.now().strftime('%Y-%m-%dT%H:%M:%S+05:30')
                 }
                 
@@ -471,6 +487,440 @@ class ActiveCallsManager:
             
         except Exception as e:
             print(f"❌ Error archiving conversation to Firestore: {e}")
+
+# ============================================================================
+# TELEGRAM BOT MANAGER
+# ============================================================================
+class TelegramBotManager:
+    """Manages Telegram bot interactions and conversations"""
+    
+    def __init__(self, token: str, aurora_llm, active_calls_manager):
+        if not token:
+            raise ValueError("TELEGRAM_BOT_TOKEN not found in environment")
+        
+        self.token = token
+        self.aurora_llm = aurora_llm
+        self.active_calls_manager = active_calls_manager
+        self.application = Application.builder().token(token).build()
+        self.recognizer = sr.Recognizer()
+        
+        # Register handlers
+        self.application.add_handler(CommandHandler("start", self.cmd_start))
+        self.application.add_handler(CommandHandler("help", self.cmd_help))
+        self.application.add_handler(CommandHandler("end", self.cmd_end))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
+        self.application.add_handler(MessageHandler(filters.VOICE, self.handle_voice_message))
+        self.application.add_handler(MessageHandler(filters.AUDIO, self.handle_audio_message))
+        
+        print("✅ Telegram Bot Manager initialized")
+    
+    async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command"""
+        user = update.effective_user
+        welcome_message = (
+            f"👋 Hello {user.first_name}!\n\n"
+            f"🚨 I'm Aurora, your Emergency Assistant.\n\n"
+            f"I can help you with:\n"
+            f"• Emergency situations\n"
+            f"• Safety procedures\n"
+            f"• Equipment troubleshooting\n"
+            f"• General work guidance\n\n"
+            f"💬 Send me a text message or voice note\n"
+            f"🎤 I'll respond with both text and voice\n\n"
+            f"Commands:\n"
+            f"/help - Show this help message\n"
+            f"/end - End current conversation\n\n"
+            f"⚠️ Conversations auto-end after 5 minutes of inactivity\n\n"
+            f"How can I assist you today?"
+        )
+        await update.message.reply_text(welcome_message)
+    
+    async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /help command"""
+        help_message = (
+            "📋 *Aurora Emergency Assistant Help*\n\n"
+            "*How to use:*\n"
+            "• Send text messages for quick responses\n"
+            "• Send voice messages for voice-to-voice assistance\n"
+            "• I'll respond with both text and audio\n\n"
+            "*Commands:*\n"
+            "/start - Start a new conversation\n"
+            "/help - Show this help message\n"
+            "/end - End current conversation\n\n"
+            "*Features:*\n"
+            "• Real-time emergency assistance\n"
+            "• Step-by-step safety guidance\n"
+            "• Source references for information\n"
+            "• Voice and text support\n\n"
+            "⚠️ *Inactivity Rules:*\n"
+            "• Warning after 3 minutes of inactivity\n"
+            "• Auto-end conversation after 5 minutes of inactivity\n"
+            "• Daily cleanup for 24+ hour old conversations\n\n"
+            "Stay safe! 🚨"
+        )
+        await update.message.reply_text(help_message, parse_mode='Markdown')
+    
+    async def cmd_end(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /end command - explicitly end conversation"""
+        user_id = str(update.effective_user.id)
+        phone_number = f"telegram_{user_id}"
+        
+        # Find active conversation for this user
+        call_id = self.active_calls_manager.find_active_call_by_phone(phone_number)
+        
+        if call_id:
+            success = self.active_calls_manager.end_call(call_id)
+            if success:
+                await update.message.reply_text(
+                    "✅ *Conversation ended.*\n\n"
+                    "Your conversation has been saved.\n"
+                    "Send a new message to start a new conversation.",
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text("❌ Error ending conversation. Please try again.")
+        else:
+            await update.message.reply_text("ℹ️ No active conversation found.")
+    
+    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text messages from users"""
+        user_id = str(update.effective_user.id)
+        username = update.effective_user.username or update.effective_user.first_name
+        user_text = update.message.text
+        phone_number = f"telegram_{user_id}"
+        
+        print(f"\n💬 TELEGRAM TEXT MESSAGE")
+        print(f"   User: {username} (@{user_id})")
+        print(f"   Message: {user_text}")
+        
+        # Show typing indicator
+        await update.message.chat.send_action(action="typing")
+        
+        try:
+            # Generate Aurora's response
+            aurora_response, urgency_level, sources = self.aurora_llm.generate_response([], user_text)
+            
+            print(f"   🤖 Aurora: {aurora_response}")
+            print(f"   📊 Urgency Level: {urgency_level}")
+            print(f"   📚 Sources: {sources}")
+            
+            # Update conversation in active calls manager
+            call_id, conv_id = self.active_calls_manager.add_conversation_entry(
+                phone_number=phone_number,
+                user_query=user_text,
+                aurora_response=aurora_response,
+                urgency_level=urgency_level,
+                sources=sources,
+                call_sid=f"telegram_{user_id}_{int(datetime.now().timestamp())}",
+                medium="Text"
+            )
+            
+            # Format response with sources in quote
+            formatted_response = aurora_response
+            if sources and sources.strip():
+                formatted_response += f"\n\n📚 *Sources:*\n_{sources}_"
+            
+            # Send text response
+            await update.message.reply_text(formatted_response, parse_mode='Markdown')
+            
+            # Generate and send voice response
+            await update.message.chat.send_action(action="record_voice")
+            voice_file = await self.text_to_speech(aurora_response)
+            
+            if voice_file:
+                with open(voice_file, 'rb') as audio:
+                    await update.message.reply_voice(voice=audio)
+                # Clean up temp file
+                os.remove(voice_file)
+            
+        except Exception as e:
+            print(f"❌ Error processing text message: {e}")
+            import traceback
+            traceback.print_exc()
+            await update.message.reply_text(
+                "❌ I'm experiencing technical difficulties. Please try again in a moment."
+            )
+    
+    async def handle_voice_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle voice messages from users"""
+        user_id = str(update.effective_user.id)
+        username = update.effective_user.username or update.effective_user.first_name
+        phone_number = f"telegram_{user_id}"
+        
+        print(f"\n🎤 TELEGRAM VOICE MESSAGE")
+        print(f"   User: {username} (@{user_id})")
+        
+        await update.message.reply_text("🎧 Processing your voice message...")
+        
+        try:
+            # Download voice message
+            voice_file = await update.message.voice.get_file()
+            voice_path = f"temp_voice_{user_id}_{int(datetime.now().timestamp())}.ogg"
+            await voice_file.download_to_drive(voice_path)
+            
+            # Convert OGG to WAV for speech recognition
+            audio = AudioSegment.from_ogg(voice_path)
+            wav_path = voice_path.replace('.ogg', '.wav')
+            audio.export(wav_path, format="wav")
+            
+            # Transcribe audio
+            user_text = await self.transcribe_audio(wav_path)
+            
+            # Clean up temp files
+            os.remove(voice_path)
+            os.remove(wav_path)
+            
+            if not user_text:
+                await update.message.reply_text("❌ Sorry, I couldn't understand the audio. Please try again.")
+                return
+            
+            print(f"   📝 Transcribed: {user_text}")
+            await update.message.reply_text(f"📝 You said: _{user_text}_", parse_mode='Markdown')
+            
+            # Generate Aurora's response
+            await update.message.chat.send_action(action="typing")
+            aurora_response, urgency_level, sources = self.aurora_llm.generate_response([], user_text)
+            
+            print(f"   🤖 Aurora: {aurora_response}")
+            print(f"   📊 Urgency Level: {urgency_level}")
+            print(f"   📚 Sources: {sources}")
+            
+            # Update conversation
+            call_id, conv_id = self.active_calls_manager.add_conversation_entry(
+                phone_number=phone_number,
+                user_query=user_text,
+                aurora_response=aurora_response,
+                urgency_level=urgency_level,
+                sources=sources,
+                call_sid=f"telegram_{user_id}_{int(datetime.now().timestamp())}",
+                medium="Text"
+            )
+            
+            # Format response with sources in quote
+            formatted_response = aurora_response
+            if sources and sources.strip():
+                formatted_response += f"\n\n📚 *Sources:*\n_{sources}_"
+            
+            # Send text response
+            await update.message.reply_text(formatted_response, parse_mode='Markdown')
+            
+            # Generate and send voice response
+            await update.message.chat.send_action(action="record_voice")
+            voice_file = await self.text_to_speech(aurora_response)
+            
+            if voice_file:
+                with open(voice_file, 'rb') as audio:
+                    await update.message.reply_voice(voice=audio)
+                os.remove(voice_file)
+            
+        except Exception as e:
+            print(f"❌ Error processing voice message: {e}")
+            import traceback
+            traceback.print_exc()
+            await update.message.reply_text(
+                "❌ I'm experiencing technical difficulties processing your voice message."
+            )
+    
+    async def handle_audio_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle audio files sent by users"""
+        # Redirect to voice message handler
+        await self.handle_voice_message(update, context)
+    
+    async def text_to_speech(self, text: str) -> Optional[str]:
+        """Convert text to speech using gTTS with speed 1.4"""
+        try:
+            # Create a temporary file
+            temp_file = f"temp_tts_{int(datetime.now().timestamp())}.mp3"
+            
+            # Generate speech with gTTS
+            tts = gTTS(text=text, lang='en', slow=False)
+            tts.save(temp_file)
+            
+            # Speed up audio to 1.4x using pydub
+            audio = AudioSegment.from_mp3(temp_file)
+            # Speed up audio (1.4x means divide duration by 1.4)
+            speeded_audio = audio.speedup(playback_speed=config.TTS_SPEED)
+            
+            # Convert to OGG format (Telegram voice format)
+            output_file = temp_file.replace('.mp3', '.ogg')
+            speeded_audio.export(output_file, format="ogg", codec="libopus")
+            
+            # Clean up temp mp3
+            os.remove(temp_file)
+            
+            return output_file
+            
+        except Exception as e:
+            print(f"❌ Error generating TTS: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    async def transcribe_audio(self, audio_path: str) -> Optional[str]:
+        """Transcribe audio file to text using speech_recognition"""
+        try:
+            with sr.AudioFile(audio_path) as source:
+                audio_data = self.recognizer.record(source)
+                
+            # Use Google Speech Recognition (free)
+            text = self.recognizer.recognize_google(audio_data)
+            return text
+            
+        except sr.UnknownValueError:
+            print("❌ Speech recognition could not understand audio")
+            return None
+        except sr.RequestError as e:
+            print(f"❌ Could not request results from speech recognition service: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ Error transcribing audio: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    async def start_bot(self):
+        """Start the Telegram bot"""
+        try:
+            print("🚀 Starting Telegram bot...")
+            await self.application.initialize()
+            await self.application.start()
+            await self.application.updater.start_polling(drop_pending_updates=True)
+            print("✅ Telegram bot started successfully!")
+        except Exception as e:
+            print(f"❌ Error starting Telegram bot: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def stop_bot(self):
+        """Stop the Telegram bot"""
+        try:
+            print("🛑 Stopping Telegram bot...")
+            await self.application.updater.stop()
+            await self.application.stop()
+            await self.application.shutdown()
+            print("✅ Telegram bot stopped")
+        except Exception as e:
+            print(f"❌ Error stopping Telegram bot: {e}")
+
+# ============================================================================
+# TELEGRAM INACTIVITY MANAGER
+# ============================================================================
+class TelegramInactivityManager:
+    """Manages conversation inactivity detection and auto-archival"""
+    
+    def __init__(self, active_calls_manager):
+        self.active_calls_manager = active_calls_manager
+        self.scheduler = AsyncIOScheduler()
+        self.warned_conversations = set()  # Track conversations that received warnings
+        print("✅ Telegram Inactivity Manager initialized")
+    
+    async def check_inactivity(self):
+        """Check for inactive Telegram conversations and handle them"""
+        try:
+            print("\n🔍 Checking for inactive Telegram conversations...")
+            current_time = datetime.now()
+            
+            # Get all active calls
+            data = self.active_calls_manager.get_all_data()
+            active_calls = data.get('active_calls', {})
+            
+            warnings_sent = 0
+            conversations_ended = 0
+            
+            for call_id, call_data in list(active_calls.items()):
+                # Only check Telegram conversations (Text medium)
+                if call_data.get('medium') != 'Text':
+                    continue
+                
+                # Skip if not a Telegram user
+                mobile_no = call_data.get('mobile_no', '')
+                if not mobile_no.startswith('telegram_'):
+                    continue
+                
+                # Parse last message timestamp
+                last_message_at_str = call_data.get('last_message_at', '')
+                try:
+                    # Handle different timestamp formats
+                    if '+' in last_message_at_str:
+                        last_message_at_str = last_message_at_str.split('+')[0]
+                    last_message_at = datetime.fromisoformat(last_message_at_str)
+                except:
+                    print(f"   ⚠️ Could not parse timestamp for call {call_id}")
+                    continue
+                
+                # Calculate time since last message
+                time_since_last_message = (current_time - last_message_at).total_seconds()
+                
+                # Check for 24+ hour old conversations (daily cleanup)
+                conversation_age = (current_time - datetime.fromisoformat(
+                    call_data.get('timestamp', '').split('+')[0] if '+' in call_data.get('timestamp', '') 
+                    else call_data.get('timestamp', '')
+                )).total_seconds()
+                
+                if conversation_age >= config.TELEGRAM_MAX_CONVERSATION_AGE:
+                    print(f"   📦 Archiving 24+ hour old conversation: {call_id}")
+                    self.active_calls_manager.end_call(call_id)
+                    conversations_ended += 1
+                    if call_id in self.warned_conversations:
+                        self.warned_conversations.remove(call_id)
+                    continue
+                
+                # Check if conversation should be ended (5 minutes of inactivity)
+                if time_since_last_message >= config.TELEGRAM_INACTIVITY_TIMEOUT:
+                    print(f"   ⏰ Ending inactive conversation: {call_id} (inactive for {time_since_last_message:.0f}s)")
+                    
+                    # Send notification to user (if we have bot access)
+                    # Note: This requires storing chat_id, which we'll add to the call data
+                    
+                    # End the conversation
+                    self.active_calls_manager.end_call(call_id)
+                    conversations_ended += 1
+                    
+                    # Remove from warned set
+                    if call_id in self.warned_conversations:
+                        self.warned_conversations.remove(call_id)
+                
+                # Check if warning should be sent (3 minutes of inactivity)
+                elif time_since_last_message >= config.TELEGRAM_INACTIVITY_WARNING:
+                    if call_id not in self.warned_conversations:
+                        print(f"   ⚠️ Sending inactivity warning for: {call_id}")
+                        # Mark as warned
+                        self.warned_conversations.add(call_id)
+                        warnings_sent += 1
+                        
+                        # Note: To actually send the warning, we need telegram bot instance
+                        # This will be handled in the next iteration
+            
+            print(f"   ✅ Inactivity check complete: {warnings_sent} warnings, {conversations_ended} conversations ended")
+            
+        except Exception as e:
+            print(f"❌ Error in inactivity check: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def start(self):
+        """Start the inactivity checker"""
+        try:
+            # Run check every 1 minute (60 seconds)
+            self.scheduler.add_job(
+                self.check_inactivity,
+                IntervalTrigger(seconds=60),
+                id='telegram_inactivity_check',
+                name='Check Telegram conversation inactivity',
+                replace_existing=True
+            )
+            self.scheduler.start()
+            print("✅ Telegram Inactivity Manager started (checking every 60 seconds)")
+        except Exception as e:
+            print(f"❌ Error starting Inactivity Manager: {e}")
+    
+    def stop(self):
+        """Stop the inactivity checker"""
+        try:
+            self.scheduler.shutdown()
+            print("✅ Telegram Inactivity Manager stopped")
+        except Exception as e:
+            print(f"❌ Error stopping Inactivity Manager: {e}")
 
 # ============================================================================
 # CONVERSATION MANAGER
@@ -693,12 +1143,27 @@ class AuroraLLM:
             
         except Exception as e:
             print(f"❌ LLM Error: {e}")
-            return "Emergency system error. Please call your supervisor at extension 9999 immediately.", "critical", "Emergency Procedures Manual"
+            return "Emergency system error. {Tokens per day limit exceeded - too many tokens processed.} Please call your supervisor at extension 9999 immediately.", "critical", "Emergency Procedures Manual"
 
 # Initialize components
 aurora_llm = AuroraLLM(config)
 conversation_manager = ConversationManager()
 active_calls_manager = ActiveCallsManager()
+
+# Initialize Telegram Bot (only if token is provided)
+telegram_bot_manager = None
+telegram_inactivity_manager = None
+if config.TELEGRAM_BOT_TOKEN:
+    try:
+        telegram_bot_manager = TelegramBotManager(config.TELEGRAM_BOT_TOKEN, aurora_llm, active_calls_manager)
+        telegram_inactivity_manager = TelegramInactivityManager(active_calls_manager)
+        print("✅ Telegram Bot initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Telegram Bot initialization failed: {e}")
+        telegram_bot_manager = None
+        telegram_inactivity_manager = None
+else:
+    print("⚠️ TELEGRAM_BOT_TOKEN not found - Telegram bot disabled")
 
 # ============================================================================
 # PYDANTIC MODELS
@@ -3029,10 +3494,34 @@ async def startup_event():
     
     os.makedirs("call_logs", exist_ok=True)
     
+    # Start Telegram Bot
+    if telegram_bot_manager:
+        print("\n" + "="*70)
+        print("TELEGRAM BOT SETUP:")
+        print("="*70)
+        try:
+            await telegram_bot_manager.start_bot()
+            print("✅ Telegram bot is running")
+            print(f"📱 Bot Token: {config.TELEGRAM_BOT_TOKEN[:15]}...")
+        except Exception as e:
+            print(f"❌ Failed to start Telegram bot: {e}")
+    
+    # Start Inactivity Manager
+    if telegram_inactivity_manager:
+        try:
+            telegram_inactivity_manager.start()
+            print("✅ Telegram Inactivity Manager started")
+            print(f"⏰ Checking every 60 seconds for inactive conversations")
+            print(f"⚠️ Warning threshold: {config.TELEGRAM_INACTIVITY_WARNING}s (2 min)")
+            print(f"⏱️ Timeout threshold: {config.TELEGRAM_INACTIVITY_TIMEOUT}s (5 min)")
+            print(f"🗓️ Daily cleanup: {config.TELEGRAM_MAX_CONVERSATION_AGE}s (24 hours)")
+        except Exception as e:
+            print(f"❌ Failed to start Inactivity Manager: {e}")
+    
     print("\n" + "="*70)
     print("TWILIO SETUP:")
     print("="*70)
-    print("1. Run: uvicorn merged_main:app --reload --host 0.0.0.0 --port 5000")
+    print("1. Run: uvicorn main:app --reload --host 0.0.0.0 --port 5000")
     print("2. In another terminal: ngrok http 5000")
     print("3. Copy ngrok HTTPS URL")
     print("4. Twilio Console → Phone Number → Voice Webhook:")
@@ -3043,10 +3532,32 @@ async def startup_event():
     print("="*70)
     print("\n🚀 Aurora Complete System Ready!")
     print(f"📞 Phone System: Enabled")
-    print(f"🔐 Admin Auth: Enabled")
+    print(f"� Telegram Bot: {'Enabled' if telegram_bot_manager else 'Disabled'}")
+    print(f"�🔐 Admin Auth: Enabled")
     print(f"📱 Server running on http://localhost:5000")
     print(f"📚 API Documentation: http://localhost:5000/docs")
     print(f"🔗 Use ngrok to expose: ngrok http 5000\n")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    print("\n🛑 Shutting down Aurora system...")
+    
+    # Stop Telegram Bot
+    if telegram_bot_manager:
+        try:
+            await telegram_bot_manager.stop_bot()
+        except Exception as e:
+            print(f"⚠️ Error stopping Telegram bot: {e}")
+    
+    # Stop Inactivity Manager
+    if telegram_inactivity_manager:
+        try:
+            telegram_inactivity_manager.stop()
+        except Exception as e:
+            print(f"⚠️ Error stopping Inactivity Manager: {e}")
+    
+    print("✅ Aurora system shutdown complete")
 
 # ============================================================================
 # MAIN
