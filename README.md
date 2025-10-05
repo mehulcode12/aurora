@@ -2,8 +2,9 @@
 
 **The world's fastest AI-powered assistant for industrial workers - emergency response AND daily operations**
 
-## **[🎯 Try Aurora Live: abc.com](https://abc.com)**
+## **[🎯 Try Calling Aurora Demo Live: aurora.com/web-call](https://aurora-as.onrender.com/web-call)**
 
+[![Aurora Teaser](https://img.youtube.com/vi/bl1FBH2bYww/maxresdefault.jpg)](https://www.youtube.com/watch?v=bl1FBH2bYww)
 ---
 
 ## 🏆 What Makes Aurora Extraordinary
@@ -330,7 +331,7 @@ class AuroraLLM:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            max_tokens=200,
+            max_tokens=2000,
             temperature=0.2  # Consistent safety guidance
         )
         
@@ -525,8 +526,6 @@ def process_speech():
 - Responsive design
 - Twilio client integration
 
-```
-
 ---
 
 ## 🎯 Future Roadmap
@@ -619,11 +618,7 @@ Aurora is built with safety-first principles:
 
 ## 📞 Contact
 
-**Demo:** [abc.com](https://abc.com)  
-**Questions:** GitHub Issues in this repository
+**Demo:**[🎯aurora.com/web-call](https://aurora-as.onrender.com/web-call) 
 
 ---
-
 *Aurora: When every millisecond matters, and every worker deserves instant expertise.*
-
-**Powered by Cerebras CS-2 + Llama 3.3 70B**

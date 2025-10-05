@@ -1,0 +1,17 @@
+sounddevice 
+numpy 
+webrtcvad 
+faster-whisper 
+TTS 
+cerebras_cloud_sdk 
+huggingface_hub[hf_xet]
+python-dotenv
+twilio 
+flask
+pdfplumber
+fastapi
+uvicorn
+python-multipart
+# For web voice processing
+torch
+torchaudio

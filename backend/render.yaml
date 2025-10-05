@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: aurora-fastapi
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHONUNBUFFERED
+        value: 1
+    healthCheckPath: /
