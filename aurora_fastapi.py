@@ -313,7 +313,9 @@ class AuroraLLM:
             company_data = "Company data not available"
         
         # System prompt for phone-based industrial assistance
-        self.system_prompt = f"""You are Aurora, an friendly AI assistant for industrial workers calling via phone.
+        self.system_prompt = f"""You are Aurora, an Friendly AI assistant for industrial workers calling via phone.
+        Supervisor is "We Make Devs" and their number is 9176605997
+
 
 COMPANY INFORMATION:
 ######### start ################
