@@ -34,8 +34,8 @@ export default function Home() {
             </div>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button className="px-5 py-3 rounded-md bg-sky-700 text-white font-semibold shadow-md hover:brightness-95">Book a Demo</button>
-              <a className="px-5 py-3 rounded-md border border-slate-200 text-slate-800 font-medium" href='#howitworks'>See How It Works</a>
+              <a href='https://aurora-as.onrender.com/web-call' className="px-5 py-3 rounded-md bg-sky-700 text-white font-semibold shadow-md hover:brightness-95">Demo</a>
+              <a className="px-5 py-3 rounded-md border border-slate-200 text-slate-800 font-medium" href='#howitworks'>How It Works</a>
             </div>
           </div>
           

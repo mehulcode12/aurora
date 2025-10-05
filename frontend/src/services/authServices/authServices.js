@@ -59,7 +59,6 @@ export async function signUp(email,formData){
 export async function logIn(email,password){
     try{
         // console.log("Login Service :",LOG_IN," ",email," ",password);
-        localStorage.setItem("password",password);
         var response = await apiConnector("POST",LOG_IN,{
             email:email,
             password:password

@@ -138,6 +138,12 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              <div className='text-left'>
+                Credentials<br/>
+                Email : omsveri0143@gmail.com<br/>
+                Password : Pass@123
+              </div>
+              
               {errors.password && (
                 <div className="flex items-center mt-2 text-red-600 text-sm">
                   <AlertCircle className="w-4 h-4 mr-1" />

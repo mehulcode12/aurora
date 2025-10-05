@@ -1,9 +1,121 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, use } from 'react';
 import { Shield, MessageSquare, FileText, Archive, Settings, MessageCircle, Clock, Users, TrendingUp, RefreshCw, User, Phone, X, ArrowLeft } from 'lucide-react';
 import { UserContext } from '../App';
 import { fetchConversationUsingId } from '../services/conversationServices/conversationServices';
 import { fetchConversations } from '../services/conversationServices/conversationServices';
 import { useNavigate } from 'react-router-dom';
+import { fetchCalls,fetchCallUsingId } from '../services/conversationServices/conversationServices';
+
+// Call Card Component
+const CallCard = ({ call, onOpenCall }) => {
+  const getPriorityStyles = (urgency) => {
+    switch (urgency) {
+      case 'CRITICAL':
+        return 'bg-red-50 border-red-200';
+      case 'HIGH':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'MEDIUM':
+        return 'bg-blue-50 border-blue-200';
+      case 'LOW':
+      default:
+        return 'bg-white border-gray-200';
+    }
+  };
+
+  const getUrgencyBadge = (urgency) => {
+    const colors = {
+      CRITICAL: 'bg-red-100 text-red-800 border-red-300',
+      HIGH: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      MEDIUM: 'bg-blue-100 text-blue-800 border-blue-300',
+      LOW: 'bg-gray-100 text-gray-800 border-gray-300'
+    };
+    return colors[urgency] || colors.LOW;
+  };
+
+  const getStatusBadge = (status) => {
+    const colors = {
+      COMPLETE: 'bg-green-100 text-green-800 border-green-300',
+      ACTIVE: 'bg-blue-100 text-blue-800 border-blue-300',
+      PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-300'
+    };
+    return colors[status] || colors.PENDING;
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const formatDate = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  return (
+    <div className={`${getPriorityStyles(call.urgency)} border rounded-lg p-4 mb-3 transition hover:shadow-md`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start space-x-3 flex-1">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-semibold shadow">
+            <Phone size={20} />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-gray-900">Call {call.call_id}</h3>
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getUrgencyBadge(call.urgency)}`}>
+                {call.urgency}
+              </span>
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusBadge(call.status)}`}>
+                {call.status}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <span className="flex items-center gap-1">
+                <Phone size={14} />
+                {call.mobile_no}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock size={14} />
+                {formatDuration(call.duration_seconds)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Worker: {call.worker_id}
+            </p>
+            {call.final_action && (
+              <p className="text-xs text-blue-600 font-medium mt-1">
+                Action: {call.final_action}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="text-right ml-4">
+          <p className="text-xs text-gray-500 mb-2">{formatDate(call.timestamp)}</p>
+          <p className="text-xs text-gray-500 mb-2">{call.medium}</p>
+          <button 
+            onClick={() => onOpenCall(call.conversation_id)}
+            className="px-3 py-1.5 bg-purple-600 text-white rounded-md text-sm font-semibold hover:bg-purple-700 transition"
+          >
+            View Details
+          </button>
+        </div>
+      </div>
+      {call.admin_notes && (
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <p className="text-xs text-gray-600">
+            <span className="font-semibold">Admin Notes:</span> {call.admin_notes}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Conversation Card Component
 const ConversationCard = ({ conversation, onOpenConversation }) => {
@@ -93,7 +205,7 @@ const ConversationCard = ({ conversation, onOpenConversation }) => {
           <p className="text-xs text-gray-500 mb-2">{conversation.medium}</p>
           <button 
             onClick={() => onOpenConversation(conversation.conversation_id)}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition"
+            className="px-3 py-1.5 bg-blue-600 text-white rounded-md cursor-pointer text-sm font-semibold hover:bg-blue-700 transition"
           >
             Open Conversation
           </button>
@@ -307,7 +419,7 @@ const ConversationView = ({ conversationData, onClose, token }) => {
               
               {/* Live Stream Toggle Button */}
               <button
-                onClick={isLiveStreaming ? stopLiveStream : startLiveStream}
+                // onClick={isLiveStreaming ? stopLiveStream : startLiveStream}
                 className={`px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 ${
                   isLiveStreaming 
                     ? 'bg-red-500 hover:bg-red-600' 
@@ -329,7 +441,7 @@ const ConversationView = ({ conversationData, onClose, token }) => {
               
               <button
                 onClick={onClose}
-                className="hover:bg-blue-500 p-2 rounded-lg transition"
+                className="hover:bg-blue-500 p-2 rounded-lg transition cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -385,6 +497,7 @@ const ConversationView = ({ conversationData, onClose, token }) => {
           )}
         </div>
 
+
         {/* Footer with Status */}
         <div className="border-t border-gray-200 p-4 bg-white rounded-b-2xl">
           <div className="flex items-center justify-between">
@@ -408,16 +521,10 @@ const ConversationView = ({ conversationData, onClose, token }) => {
 const MetricCard = ({ icon: Icon, label, value, color, trend }) => {
   return (
     <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm w-1/3">
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-center justify-between mb-2">
         <div className={`w-10 h-10 ${color} rounded-lg flex items-center justify-center`}>
           <Icon className="w-5 h-5 text-white" />
         </div>
-        {trend && (
-          <span className="text-xs text-green-600 font-semibold flex items-center">
-            <TrendingUp className="w-3 h-3 mr-1" />
-            +{trend}%
-          </span>
-        )}
       </div>
       <p className="text-sm text-gray-600 mb-1">{label}</p>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
@@ -429,75 +536,38 @@ const MetricCard = ({ icon: Icon, label, value, color, trend }) => {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('conversations');
   const [selectedConversation, setSelectedConversation] = useState(null);
+  const [calls, setCalls] = useState([]);
   
   // Mock token for demonstration - replace with actual token from your app
   const {token,user,setToken,setUser} =useContext(UserContext);
   const navigate = useNavigate();
-
-  const [conversations,setConversation] = useState([
-    {
-      "call_id": "call_001",
-      "worker_id": "A4648KcygjVxPQGk9vvP",
-      "mobile_no": "+91-9876543210",
-      "conversation_id": "conv_001",
-      "urgency": "CRITICAL",
-      "status": "ACTIVE",
-      "timestamp": "2025-10-01T08:15:00+05:30",
-      "medium": "Voice",
-      "last_message_at": "2025-10-01T08:18:45+05:30",
-      "admin_id": "T1R2Hg70TBbH3qthFBwBNZewlz53"
-    },
-    {
-      call_id: "call_002",
-      worker_id: "B91fPZL5qzT8SmjH7kUe",
-      mobile_no: "+91-9988776655",
-      conversation_id: "conv_002",
-      urgency: "HIGH",
-      status: "ACTIVE",
-      timestamp: "2025-10-01T09:20:00+05:30",
-      medium: "Voice",
-      last_message_at: "2025-10-01T09:23:12+05:30",
-      admin_id: "Y8kZsR42hQvLn9DxFc3PdWm0rT57"
-    },
-    {
-      call_id: "call_005",
-      worker_id: "E8bV5tRwQmS2yNzC3kHp",
-      mobile_no: "+91-9822001100",
-      conversation_id: "conv_005",
-      urgency: "CRITICAL",
-      status: "ACTIVE",
-      timestamp: "2025-10-01T12:30:00+05:30",
-      medium: "Video",
-      last_message_at: "2025-10-01T12:34:58+05:30",
-      admin_id: "K6vWq3Dn5RzF8xLyJ1bPpM4tG92E"
-    },
-    {
-      call_id: "call_007",
-      worker_id: "G5pM8cZwDfE1nRbS0qLx",
-      mobile_no: "+91-9887766554",
-      conversation_id: "conv_007",
-      urgency: "MEDIUM",
-      status: "ACTIVE",
-      timestamp: "2025-10-01T14:05:00+05:30",
-      medium: "Chat",
-      last_message_at: "2025-10-01T14:08:17+05:30",
-      admin_id: "R4mXq8VnJ5hK2dTwY1cLzP9fE63B"
+  useEffect(() => {
+    if (!token || !user) {
+      navigate('/login');
     }
-  ]);
+  }, [token,user, navigate]);
+  const [conversations,setConversation] = useState([]);
 
   const handleOpenConversation = async (conversation_id) => {
     console.log('Opening conversation:', conversation_id);
-    // In production, you would fetch the conversation data from your API here
-    // For demo purposes, we're using the sample data
 
     const conversationData = await fetchConversationUsingId(conversation_id,token);
+    console.log("Fetched Conversation Data:", conversationData);
+    setSelectedConversation(conversationData?.conversation);
+  };
+  const handleOpenCall = async (call_id) => {
+    console.log('Opening conversation:', call_id);
+
+    const conversationData = await fetchCallUsingId(call_id,token);
     console.log("Fetched Conversation Data:", conversationData);
     setSelectedConversation(conversationData?.conversation);
   };
 
   const handleLiveUpdate = async() => {
     const conversations = await fetchConversations(token,user);
+    const  calls = await fetchCalls(token);
     setConversation(conversations?.active_calls);
+    setCalls(calls?.calls || []);
     console.log('Refreshing live data...');
   };
 
@@ -514,20 +584,31 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
       {/* Sidebar */}
-      <div className="fixed z-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg flex flex-col justify-between">
+      <div className="fixed z-0 left-0 h-[93%] w-64 bg-white border-r border-gray-200 shadow-lg flex flex-col justify-between">
         <div>
-          <div className="p-6 mt-6">
+          <div className="p-6 pt-12">
             <nav className="space-y-2">
               <button
                 onClick={() => setActiveTab('conversations')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${
+                className={`w-full flex items-center px-2 py-3 rounded-lg transition cursor-pointer ${
                   activeTab === 'conversations'
                     ? 'bg-blue-50 text-blue-600 font-semibold'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <MessageSquare className="w-5 h-5" />
+                <MessageSquare className="w-5 h-5 mr-2" />
                 <span>Active Conversations</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('calls')}
+                className={`w-full flex items-start px-4 py-3 rounded-lg transition cursor-pointer ${
+                  activeTab === 'calls'
+                    ? 'bg-purple-50 text-purple-600 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Phone className="w-5 h-5 mr-2" />
+                <span>All Calls</span>
               </button>
             </nav>
           </div>
@@ -536,10 +617,10 @@ export default function AdminDashboard() {
           <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200 bg-gray-50">
             <button
               onClick={handleLogout}
-              className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 bg-red-600 text-white cursor-pointer rounded-lg font-semibold hover:bg-red-700 transition flex items-center justify-center gap-2"
             >
-              <X className="w-5 h-5" />
-              <span>Logout</span>
+              {/* <X className="w-5 h-5" /> */}
+              Logout
             </button>
           </div>
           <div className="absolute bottom-24 left-0 right-0 p-6 border-t border-gray-200 bg-gray-50">
@@ -548,8 +629,8 @@ export default function AdminDashboard() {
                 <User size={20} />
               </div>
               <div>
-                <p className="text-xs text-gray-500">{user.email}</p>
-                <p className="text-sm font-semibold text-gray-900">{user.designation}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-sm font-semibold text-gray-900">{user?.designation}</p>
               </div>
             </div>
           </div>
@@ -561,14 +642,21 @@ export default function AdminDashboard() {
       <div className="ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-start justify-between mb-2 text-left">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Active Conversations</h1>
-              <p className="text-gray-600">Real-time overview of all ongoing customer interactions</p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                {activeTab === 'conversations' ? 'Active Conversations' : 'All Calls'}
+              </h1>
+              <p className="text-gray-600">
+                {activeTab === 'conversations' 
+                  ? 'Real-time overview of all ongoing customer interactions'
+                  : 'Complete history of all calls and their details'
+                }
+              </p>
             </div>
             <button 
               onClick={handleLiveUpdate}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-600/30 flex items-center gap-2"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg cursor-pointer font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-600/30 flex items-center gap-2"
             >
               <RefreshCw className="w-5 h-5" />
               <span>Live Update</span>
@@ -597,9 +685,11 @@ export default function AdminDashboard() {
                 />
                 
                 <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm w-[25%]">
-                  <div className="w-10 h-8 bg-red-600 rounded-lg flex items-center justify-center mb-2">
+                  <div className='w-full mx-auto'>
+                    <div className="w-10 h-8 bg-red-600 rounded-lg flex items-center justify-center mb-2 ">
                     <MessageSquare className="w-5 h-5 text-white" />
-                  </div>
+                    </div>
+                  </div> 
                   <p className="text-sm text-gray-600 mb-1">Active Issues</p>
                   <p className="text-2xl font-bold text-gray-900">{conversations?.length}</p>
                 </div>
@@ -628,23 +718,45 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Ongoing Conversations</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            {activeTab === 'conversations' ? 'Ongoing Conversations' : 'Call History'}
+          </h2>
           
-          <div>
-            {conversations && conversations.map((conversation) => (
-              <ConversationCard
-                key={conversation.conversation_id}
-                conversation={conversation}
-                onOpenConversation={handleOpenConversation}
-              />
-            ))}
-          </div>
-
-          {conversations?.length === 0 && (
-            <div className="text-center py-12">
-              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">No active conversations</p>
-              <p className="text-sm text-gray-400 mt-1">All clear! No emergencies at the moment.</p>
+          {activeTab === 'conversations' ? (
+            <div>
+              {conversations && conversations.map((conversation) => (
+                <ConversationCard
+                  key={conversation.conversation_id}
+                  conversation={conversation}
+                  onOpenConversation={handleOpenConversation}
+                />
+              ))}
+              
+              {conversations?.length === 0 && (
+                <div className="text-center py-12">
+                  <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium">No active conversations</p>
+                  <p className="text-sm text-gray-400 mt-1">All clear! No emergencies at the moment.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              {calls && calls.map((call) => (
+                <CallCard
+                  key={call.call_id}
+                  call={call}
+                  onOpenCall={handleOpenCall}
+                />
+              ))}
+              
+              {calls?.length === 0 && (
+                <div className="text-center py-12">
+                  <Phone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium">No calls found</p>
+                  <p className="text-sm text-gray-400 mt-1">No call history available at the moment.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
