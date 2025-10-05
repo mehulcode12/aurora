@@ -4,6 +4,8 @@
 
 ## **[🎯 Try Calling Aurora Demo Live: aurora.com/web-call](https://aurora-as.onrender.com/web-call)**
 
+## **[🎯 Check Deployment: aurora.com](https://aurora-delta-five.vercel.app/)**
+
 [![Aurora Teaser](https://img.youtube.com/vi/bl1FBH2bYww/maxresdefault.jpg)](https://www.youtube.com/watch?v=bl1FBH2bYww)
 ---
 
@@ -132,9 +134,11 @@ Aurora is the complete industrial AI assistant - handling everything from life-t
 
 **One system, infinite use cases.** From life-saving emergency response to productivity-boosting daily assistance - this is the AI assistant every industrial facility needs.
 
+#### [🎯 Also Available Telegram BOT](https://t.me/Aurora_AI_04_Bot)
+
 ### 4. Live Supervisor Dashboard
 
-While Aurora handles calls autonomously, supervisors maintain complete oversight through our real-time dashboard at **[abc.com](https://abc.com)**:
+While Aurora handles calls autonomously, supervisors maintain complete oversight through our real-time dashboard at **[aurora.com](https://aurora-delta-five.vercel.app/)**:
 
 **Dashboard Features:**
 - ⚡ Live call monitoring with real-time transcripts
@@ -178,7 +182,7 @@ Every interaction stored in Firebase with:
 │  ↓                                               │
 │  Firebase Real-time Database                    │
 │  ↓                                               │
-│  Live Dashboard at abc.com                      │
+│  Live Dashboard at aurora.com                      │
 └─────────────────────────────────────────────────┘
 
 Total: 500ms average response time
@@ -256,7 +260,7 @@ permit required - contact safety officer extension 3333."
 
 ### 2. Production-Ready System
 This isn't a demo or prototype. Aurora is:
-- ✅ Deployed and accessible at **[abc.com](https://abc.com)**
+- ✅ Deployed and accessible at **[aurora.com](https://aurora-delta-five.vercel.app/)**
 - ✅ Handling real phone calls through Twilio
 - ✅ Storing conversations in Firebase
 - ✅ Monitoring calls through live dashboard
@@ -429,7 +433,7 @@ def process_speech():
 
 ---
 
-## 🎨 Dashboard at abc.com
+## 🎨 Dashboard at aurora.com
 
 ### Live Monitoring Interface
 
@@ -446,7 +450,7 @@ def process_speech():
 - Downloadable compliance reports
 - Trend analysis
 
-**Try it yourself: [abc.com](https://abc.com)**
+**Try it yourself: [aurora.com](https://aurora-delta-five.vercel.app/)**
 
 ---
 
@@ -472,7 +476,7 @@ def process_speech():
 - **Best practices**: Expert guidance on-demand
 - **After-hours support**: No supervisor? No problem.
 
-**One system. Infinite applications. Deployed at abc.com.**
+**One system. Infinite applications. Deployed at aurora.com.**
 
 ---
 
@@ -499,7 +503,7 @@ def process_speech():
 
 ### Live System
 
-**Production URL:** [abc.com](https://abc.com)
+**Production URL:** [aurora.com](https://aurora-delta-five.vercel.app/)
 
 **For Workers:**
 - Call the designated number
@@ -508,7 +512,7 @@ def process_speech():
 - Continue conversation as needed
 
 **For Supervisors:**
-- Visit abc.com
+- Visit aurora.com
 - Monitor all active calls
 - Take over any call with one click
 - Search historical conversations
@@ -578,7 +582,7 @@ Aurora is built with safety-first principles:
 ### 1. Technical Excellence
 - **Breakthrough performance**: 500ms response time
 - **Cutting-edge AI**: Cerebras + Llama 3.1
-- **Production deployment**: Live at abc.com
+- **Production deployment**: Live at aurora.com
 - **Complete system**: Phone, AI, dashboard, storage
 
 ### 2. Real-World Impact
@@ -594,7 +598,7 @@ Aurora is built with safety-first principles:
 - **Scalable**: Unlimited concurrent users
 
 ### 4. Execution
-- **Fully functional**: Try it at abc.com
+- **Fully functional**: Try it at aurora.com
 - **Professional quality**: Production-grade code
 - **Complete documentation**: This README
 - **Clear vision**: Roadmap for growth
@@ -602,10 +606,6 @@ Aurora is built with safety-first principles:
 **Aurora isn't just a hackathon project - it's the future of industrial worker assistance.**
 
 ---
-
-## 🎬 Try Aurora Now
-
-**Live Demo:** [abc.com](https://abc.com)
 
 **Experience:**
 - The 500ms response magic
