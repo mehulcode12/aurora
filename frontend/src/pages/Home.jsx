@@ -35,7 +35,7 @@ export default function Home() {
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <a href='https://aurora-as.onrender.com/web-call' className="px-5 py-3 rounded-md bg-sky-700 text-white font-semibold shadow-md hover:brightness-95">Demo</a>
-              <a className="px-5 py-3 rounded-md border border-slate-200 text-slate-800 font-medium" href='#howitworks'>How It Works</a>
+              <a className="px-5 py-3 rounded-md border border-slate-200 text-slate-800 font-medium" href='https://t.me/Aurora_AI_04_Bot'>Try Telegram Bot</a>
             </div>
           </div>
           
