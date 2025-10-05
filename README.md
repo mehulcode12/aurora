@@ -7,6 +7,7 @@
 [![Aurora Teaser](https://img.youtube.com/vi/bl1FBH2bYww/maxresdefault.jpg)](https://www.youtube.com/watch?v=bl1FBH2bYww)
 ---
 
+
 ## 🏆 What Makes Aurora Extraordinary
 
 Aurora achieves what was previously impossible: **500 millisecond response times** for AI assistance through phone calls. Whether a worker reports a gas leak emergency OR asks how to operate equipment, they hear intelligent, contextual guidance in **half a second** - faster than most humans can react.
