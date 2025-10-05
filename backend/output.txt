@@ -1,0 +1,456 @@
+# Comprehensive Company Profile: Apex Manufacturing Industries Pvt. Ltd.
+
+## 1. Company Overview
+
+*Company Name:* Apex Manufacturing Industries Pvt. Ltd.
+
+*Established:* 2008
+
+*Headquarters:* Plot No. 47-52, MIDC Industrial Area, Chakan, Pune, Maharashtra - 410501, India
+
+*Branch Office:* 3rd Floor, Tech Park Plaza, Whitefield, Bangalore, Karnataka - 560066
+
+*Industry Type:* Automotive Component Manufacturing (Tier-1 Supplier)
+
+*Primary Products:*
+- Precision-engineered transmission components
+- Gear assemblies and differential systems
+- Clutch plates and pressure assemblies
+- CNC-machined automotive parts
+- Metal stampings and forgings
+
+*Annual Revenue:* ₹485 crores (FY 2024-25)
+
+*Employee Strength:* 847 employees across all locations
+
+*Certifications:* 
+- ISO 9001:2015 (Quality Management)
+- ISO 14001:2015 (Environmental Management)
+- ISO 45001:2018 (Occupational Health & Safety)
+- IATF 16949:2016 (Automotive Quality Management)
+
+*Major Clients:* Tata Motors, Mahindra & Mahindra, Maruti Suzuki India Ltd., Ashok Leyland, Bajaj Auto
+
+## 2. Organizational Structure
+
+### Executive Leadership
+
+*Managing Director:* Mr. Rajesh Khanna
+- Email: rajesh.khanna@apexmanufacturing.in
+- Mobile: +91-98765-43210
+- Office: +91-2135-678900
+
+*Chief Executive Officer (CEO):* Ms. Priya Deshmukh
+- Email: priya.deshmukh@apexmanufacturing.in
+- Mobile: +91-98765-43211
+- Office: +91-2135-678901
+
+*Chief Operating Officer (COO):* Mr. Arun Kumar Sharma
+- Email: arun.sharma@apexmanufacturing.in
+- Mobile: +91-98765-43212
+- Office: +91-2135-678902
+
+*Chief Financial Officer (CFO):* Mr. Suresh Iyer
+- Email: suresh.iyer@apexmanufacturing.in
+- Mobile: +91-98765-43213
+- Office: +91-2135-678903
+
+### Department Heads
+
+*Production Department*
+- Head: Mr. Vikram Patil (VP - Manufacturing)
+- Email: vikram.patil@apexmanufacturing.in
+- Mobile: +91-98765-43220
+- Shift Supervisors:
+  - Morning Shift (6 AM - 2 PM): Mr. Ganesh Rao (+91-98765-43225)
+  - Afternoon Shift (2 PM - 10 PM): Mr. Satish Kulkarni (+91-98765-43226)
+  - Night Shift (10 PM - 6 AM): Mr. Ramesh Pawar (+91-98765-43227)
+
+*Quality Assurance Department*
+- Head: Dr. Meena Krishnan (Quality Manager)
+- Email: meena.krishnan@apexmanufacturing.in
+- Mobile: +91-98765-43230
+- QA Supervisors: 5 personnel (one per production line)
+
+*Maintenance & Engineering Department*
+- Head: Mr. Karthik Reddy (Engineering Manager)
+- Email: karthik.reddy@apexmanufacturing.in
+- Mobile: +91-98765-43240
+- Electrical Supervisor: Mr. Dinesh Kumar (+91-98765-43241)
+- Mechanical Supervisor: Mr. Prakash Joshi (+91-98765-43242)
+
+*Health, Safety & Environment (HSE) Department*
+- Head: Ms. Anjali Mehta (HSE Manager)
+- Email: anjali.mehta@apexmanufacturing.in
+- Mobile: +91-98765-43250
+- Emergency Response Coordinator: Mr. Rohit Verma (+91-98765-43251)
+
+*Human Resources Department*
+- Head: Ms. Kavita Nair (HR Manager)
+- Email: kavita.nair@apexmanufacturing.in
+- Mobile: +91-98765-43260
+
+*Supply Chain & Logistics*
+- Head: Mr. Amit Patel (SCM Manager)
+- Email: amit.patel@apexmanufacturing.in
+- Mobile: +91-98765-43270
+
+*Finance & Accounts*
+- Head: Ms. Ritu Malhotra (Finance Manager)
+- Email: ritu.malhotra@apexmanufacturing.in
+- Mobile: +91-98765-43280
+
+*IT & Systems*
+- Head: Mr. Sanjay Gupta (IT Manager)
+- Email: sanjay.gupta@apexmanufacturing.in
+- Mobile: +91-98765-43290
+- IT Helpdesk: +91-2135-678999 (24/7)
+
+## 3. Facility Information
+
+### Main Manufacturing Plant (Chakan, Pune)
+
+*Total Area:* 12 acres
+*Built-up Area:* 85,000 sq. meters
+
+*Production Lines:*
+- CNC Machining Center: 25 machines (Lines 1-3)
+- Gear Manufacturing Unit: 15 machines (Line 4)
+- Heat Treatment Facility (Line 5)
+- Assembly Lines: 4 lines (Lines 6-9)
+- Stamping & Forging Unit (Line 10)
+
+*Facilities:*
+- Raw Material Warehouse: 8,000 sq. meters
+- Finished Goods Warehouse: 6,000 sq. meters
+- Quality Testing Laboratory
+- Tool Room
+- Maintenance Workshop
+- Employee Cafeteria (capacity: 400)
+- Admin Block
+- Security Gate House
+
+*Operating Hours:*
+- Production: 24/7 (three shifts)
+- Administration: 9:30 AM - 6:30 PM (Monday-Saturday)
+
+## 4. Standard Operating Procedures (SOPs)
+
+### SOP-001: Machine Startup Procedure
+
+*Applicable to:* All CNC machines and production equipment
+
+*Procedure:*
+1. Perform visual inspection of machine exterior for any damage or leaks
+2. Check emergency stop buttons for proper functioning
+3. Verify coolant and lubricant levels (minimum 75% capacity)
+4. Inspect tool holders and cutting tools for wear or damage
+5. Check workpiece clamping fixtures for stability
+6. Power on the machine control panel
+7. Allow 5-minute warm-up cycle for hydraulic systems
+8. Run machine in idle mode for 2 minutes
+9. Perform test cycle without workpiece
+10. Record startup checklist in machine logbook
+11. Obtain supervisor approval before production start
+
+*Responsible Person:* Machine Operator
+*Verification by:* Shift Supervisor
+*Frequency:* Every shift start
+
+### SOP-002: Quality Inspection Protocol
+
+*Applicable to:* All manufactured components
+
+*Procedure:*
+1. Collect sample components as per sampling plan (first piece, every 50th piece, last piece)
+2. Clean components thoroughly before inspection
+3. Measure critical dimensions using calibrated instruments (CMM, vernier calipers, micrometers)
+4. Check surface finish using roughness tester
+5. Verify dimensional tolerances against engineering drawings
+6. Perform visual inspection for burrs, cracks, or surface defects
+7. Record measurements in quality control register
+8. Tag approved components with green sticker, rejected with red sticker
+9. Segregate rejected components in designated rejection bin
+10. Alert Quality Manager if rejection rate exceeds 2%
+11. Update quality dashboard in ERP system
+
+*Responsible Person:* Quality Inspector
+*Frequency:* As per sampling plan
+*Documentation:* QC Report Form QF-002
+
+### SOP-003: Personal Protective Equipment (PPE) Requirements
+
+*Mandatory PPE for Production Floor:*
+- Safety helmet (ISI marked)
+- Safety shoes with steel toe cap
+- High-visibility safety vest
+- Safety goggles or face shield (for grinding/machining operations)
+- Ear plugs or ear muffs in noise zones (>85 dB areas)
+- Hand gloves (cut-resistant for material handling, heat-resistant for furnace operations)
+- Dust mask or respirator (for grinding/heat treatment areas)
+
+*Special PPE Requirements:*
+- Welding operations: Welding helmet, leather apron, leather gloves
+- Chemical handling: Chemical-resistant gloves, full-face shield, apron
+- Confined space entry: Full-body harness, self-contained breathing apparatus
+
+*PPE Inspection:*
+- Daily visual inspection by worker before shift
+- Weekly inspection by supervisor with documentation
+- Damaged PPE must be replaced immediately through stores department
+
+*PPE Distribution Point:* Stores Department, Ground Floor, Admin Block
+*Contact:* Mr. Narayan Pawar (+91-98765-43295)
+
+### SOP-004: Material Handling and Storage
+
+*Procedure:*
+1. Verify material against delivery challan/gate pass
+2. Check material condition for damage during transit
+3. Record material receipt in ERP system with batch number
+4. Store materials in designated rack locations as per FIFO principle
+5. Heavy materials (>25 kg) must be moved using forklifts or cranes
+6. Ensure adequate aisle space (minimum 1.5 meters) for material movement
+7. Stack materials to maximum height of 2.5 meters
+8. Label all storage locations with material code and bin number
+9. Maintain material traceability records
+10. Conduct monthly physical inventory verification
+
+*Forklift Operators:* Certified personnel only (contact Logistics Manager for authorized list)
+*Crane Operations:* Permit required from Engineering Department
+
+### SOP-005: Shift Handover Protocol
+
+*Procedure:*
+1. Outgoing shift supervisor prepares handover report 30 minutes before shift end
+2. Document production status, machine status, quality issues, safety incidents
+3. Highlight pending work, machine breakdowns, material shortages
+4. Conduct physical walkthrough of production floor with incoming supervisor
+5. Transfer custody of keys, tablets, and communication devices
+6. Incoming supervisor acknowledges handover by signing logbook
+7. Brief incoming shift operators on critical issues
+8. Update digital shift handover form in ERP system
+
+*Handover Timing:*
+- Morning to Afternoon: 1:30 PM - 2:00 PM
+- Afternoon to Night: 9:30 PM - 10:00 PM
+- Night to Morning: 5:30 AM - 6:00 AM
+
+## 5. Emergency Protocols
+
+### EMERGENCY CONTACT NUMBERS (24/7)
+
+*Internal Emergency Response Team:*
+- Emergency Control Room: +91-2135-678888
+- Security Control Room: +91-2135-678889
+- HSE Manager (Anjali Mehta): +91-98765-43250
+- Emergency Response Coordinator (Rohit Verma): +91-98765-43251
+- Medical Room: +91-2135-678887
+- Fire Safety Officer: +91-98765-43252
+
+*External Emergency Services:*
+- Fire Brigade: 101
+- Police: 100
+- Ambulance: 108
+- District Hospital, Chakan: +91-2135-672222
+- Lokmanya Hospital, Pune: +91-20-27652222
+
+*Utility Services:*
+- MSEB (Electricity Fault): 1912
+- Maharashtra Jeevan Pradhikaran (Water): +91-2135-673333
+- Gas Leak Emergency: +91-98765-43253
+
+### EMERGENCY PROTOCOL-001: Fire Emergency
+
+*Immediate Actions:*
+1. Activate nearest fire alarm pull station
+2. Evacuate area immediately using designated escape routes
+3. Do not use elevators; use staircases only
+4. Call Emergency Control Room (678888)
+5. If fire is small and you are trained, use appropriate fire extinguisher (remember PASS: Pull, Aim, Squeeze, Sweep)
+6. Close doors and windows to contain fire spread
+7. Assemble at designated muster points:
+   - Assembly Point A: Main Gate parking area
+   - Assembly Point B: Cafeteria lawn
+   - Assembly Point C: West gate open ground
+
+*Fire Fighting Equipment Locations:*
+- Fire extinguishers: Every 30 meters in production area
+- Fire hydrants: 12 locations marked with red signage
+- Fire hose reels: Near each exit door
+- Fire blankets: Canteen, electrical rooms, welding bay
+
+*Fire Warden Responsibilities:*
+- Check all rooms and restrooms in assigned zone
+- Ensure complete evacuation
+- Report headcount to Emergency Coordinator at assembly point
+- Do not re-enter building until "All Clear" signal
+
+*Fire Wardens (Shift-wise):*
+- Morning: Mr. Ashok Patil (+91-98765-43296)
+- Afternoon: Ms. Sneha Desai (+91-98765-43297)
+- Night: Mr. Mahesh Bhosale (+91-98765-43298)
+
+### EMERGENCY PROTOCOL-002: Medical Emergency/Injury
+
+*For Minor Injuries:*
+1. Report to Medical Room (Ground Floor, Admin Block)
+2. First Aider on duty: Available 24/7
+3. Document injury in accident register
+4. Inform supervisor immediately
+
+*For Major Injuries:*
+1. Do not move injured person unless in immediate danger
+2. Call Emergency Control Room: 678888
+3. Provide first aid if trained (emergency medical kits available at 15 locations)
+4. Call ambulance: 108
+5. Inform HSE Manager: +91-98765-43250
+6. Keep injured person comfortable and calm
+7. Preserve accident scene for investigation
+8. Document witnesses and circumstances
+
+*Company Medical Support:*
+- On-site Medical Officer: Dr. Ashwin Patwardhan (Available: 8 AM - 5 PM on weekdays)
+- Occupational Health Nurse: Ms. Rina D'Souza (24/7 on-call: +91-98765-43254)
+
+*Tie-up Hospitals:*
+- Primary: Lokmanya Hospital, Pune (22 km) - 24/7 Ambulance Service
+- Secondary: District Hospital, Chakan (8 km)
+
+### EMERGENCY PROTOCOL-003: Chemical Spill/Leak
+
+*Types of Chemicals on Site:*
+- Hydraulic oils
+- Cutting fluids and coolants
+- Cleaning solvents
+- Heat treatment quenching oils
+- Acids for surface treatment (stored in designated chemical storage room)
+
+*Immediate Actions:*
+1. Evacuate immediate area (minimum 10-meter radius)
+2. Alert personnel in surrounding areas
+3. Call Emergency Control Room: 678888
+4. Identify chemical from label/SDS (Safety Data Sheet)
+5. Do not touch or walk through spilled material
+6. Wear appropriate PPE before approaching spill
+
+*For Small Spills (<10 liters):*
+1. Use spill containment kit (located in chemical storage area and maintenance shop)
+2. Absorb liquid with spill absorbent material
+3. Collect contaminated absorbent in designated hazardous waste drum
+4. Ventilate area thoroughly
+5. Report to HSE Department
+
+*For Large Spills (>10 liters):*
+1. Activate emergency response team
+2. Shut off ignition sources in vicinity
+3. Prevent spill from entering drains or water bodies
+4. Use sand berms to contain spread
+5. Wait for trained emergency response team
+6. Evacuate building if chemical produces toxic fumes
+
+*Chemical Emergency Response Team:* Led by HSE Manager, 8 trained members available on each shift
+
+*SDS (Safety Data Sheets) Location:* Chemical storage room, HSE office, digital copies in company intranet
+
+### EMERGENCY PROTOCOL-004: Electrical Emergency
+
+*Warning Signs:*
+- Burning smell
+- Sparks or arcing
+- Smoke from electrical panels
+- Tingling sensation when touching equipment
+- Tripped circuit breakers
+
+*Immediate Actions:*
+1. Do not touch equipment or person in contact with electricity
+2. Alert nearby personnel to stay clear
+3. If safe, switch off power at main panel
+4. Call Emergency Control Room: 678888
+5. For electrical fire, use CO2 or dry powder extinguisher only (never use water)
+
+*For Electric Shock Victim:*
+1. Do not touch victim while in contact with power source
+2. Switch off power supply immediately
+3. If power cannot be switched off, use non-conductive material (dry wooden stick, rubber mat) to separate victim from source
+4. Call ambulance: 108
+5. Begin CPR if trained and victim is not breathing
+6. Keep victim warm and comfortable
+
+*Authorized Electrical Personnel:*
+- Electrical Supervisor: Mr. Dinesh Kumar (+91-98765-43241)
+- Shift Electricians: 2 per shift (contact through control room)
+
+*Power Isolation Points:* Clearly marked main distribution boards in:
+- Production floor (3 locations)
+- Assembly area (2 locations)
+- Utilities room
+- Admin block
+
+### EMERGENCY PROTOCOL-005: Natural Disaster (Earthquake/Flood)
+
+*During Earthquake:*
+1. DROP to hands and knees
+2. COVER head and neck under sturdy furniture
+3. HOLD ON until shaking stops
+4. Stay away from windows, heavy machinery, and storage racks
+5. Do not rush outside during shaking
+6. After shaking stops, evacuate building calmly
+7. Assemble at designated muster points
+8. Do not re-enter until structural safety is confirmed by Engineering Department
+
+*During Flood Alert (Monsoon Season: June-September):*
+1. Monitor weather warnings shared by HSE Department
+2. Store critical documents and equipment at elevated levels
+3. Ensure electrical equipment in low-lying areas is switched off
+4. Keep emergency supplies ready (torches, first aid kits, food, water)
+5. If evacuation order given, proceed to upper floors or designated safe area
+6. Do not attempt to drive or walk through flooded areas
+
+*Monsoon Preparedness Coordinator:* Engineering Manager
+
+## 6. Internal Communication Channels
+
+*Primary Communication Systems:*
+1. Company Mobile App: "Apex Connect" (available on Android/iOS)
+2. Desktop Phones: Internal extension system
+3. PA System: Factory-wide announcements
+4. Digital Display Boards: Production status, safety messages
+5. Email: Official communications
+6. WhatsApp Groups: Departmental coordination (authorized groups only)
+
+*Emergency Communication Protocol:*
+- Level 1 (Minor): Inform immediate supervisor
+- Level 2 (Moderate): Inform Department Head + HSE Manager
+- Level 3 (Major): Activate Emergency Control Room + Senior Management
+
+*Shift Communication Boards:* Located at:
+- Production floor entrance
+- Cafeteria notice board
+- Time office
+- Quality lab entrance
+
+## 7. Employee Support Services
+
+*Transportation:*
+- Company buses: 12 routes covering Pune, Pimpri-Chinchwad, Chakan areas
+- Transport Coordinator: Mr. Shrikant Bhise (+91-98765-43275)
+
+*Canteen Services:*
+- Breakfast: 6:30 AM - 9:00 AM
+- Lunch: 12:00 PM - 2:30 PM
+- Dinner: 7:00 PM - 9:30 PM
+- Night shift meals: 12:30 AM - 1:30 AM
+- Canteen Manager: Ms. Lata Joshi (+91-98765-43276)
+
+*Security:*
+- 24/7 security with CCTV surveillance
+- Visitor management system
+- Vehicle access control
+- Security Manager: Mr. Vikas Rane (+91-98765-43277)
+
+*Employee Grievance Cell:*
+- Chairperson: HR Manager
+- Members: One representative from each department
+- Grievance email: grievance@apexmanufacturing.in
+- Anonymous complaint box: Near HR office
