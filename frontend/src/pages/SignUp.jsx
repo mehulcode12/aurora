@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
-import { Shield, Mail, User, Briefcase, Building, FileText, CheckCircle, AlertCircle, ArrowRight, Upload, X } from 'lucide-react';
+import { Shield, Mail, User, Briefcase, Building, FileText, CheckCircle, AlertCircle, ArrowRight, Upload, X,Lock, Eye, EyeOff} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getOtp,verifyOtp } from '../services/authServices/authServices';
+import { signUp } from '../services/authServices/authServices';
+import { useNavigate } from 'react-router-dom';
 
 export default function Signup() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Email verification, 2: Full registration
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('projects.dev.om@gmail.com');
+  const [otp, setOtp] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [showPassword, setShowPassword] = useState(true);
+  const [tempToken,setTempToken]= useState('');
   // Form fields
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    password:'',
+    tempToken:'',
     position: '',
     companyName: '',
     companyManual: null
@@ -18,12 +29,13 @@ export default function Signup() {
   
   const [errors, setErrors] = useState({});
 
-  // Handle email verification
-  const handleEmailVerification = () => {
+  // Handle OTP request
+  const handleGetOtp = async () => {
     setErrors({});
     
     if (!email) {
       setErrors({ email: 'Email is required' });
+
       return;
     }
     
@@ -32,12 +44,43 @@ export default function Signup() {
       return;
     }
     
-    // Simulate email verification
+    // Simulate OTP sending
+    setIsSendingOtp(true);
+    const response = await getOtp(email);
+    if(response?.data?.success !== true){
+      setErrors({ email: 'Failed to send OTP. Please try again.' });
+      setIsSendingOtp(false);
+      return;
+    }
+    setIsSendingOtp(false);
+    setIsOtpSent(true);
+  };
+
+  // Handle OTP verification
+  const handleVerifyOtp = async () => {
+    setErrors({});
+    
+    if (!otp) {
+      setErrors({ otp: 'OTP is required' });
+      return;
+    }
+    
+    if (otp.length !== 6) {
+      setErrors({ otp: 'OTP must be 6 digits' });
+      return;
+    }
+    
+    // Simulate OTP verification
     setIsVerifying(true);
-    setTimeout(() => {
+    const response = await verifyOtp(email,otp);
+    if(response?.status!==200){
+    // if(response?.data?.success !== true){
+      setErrors({ otp: 'Invalid OTP. Please try again.' });
+      setIsVerifying(false);
+    }
+      setTempToken(response?.data?.temp_token);
       setIsVerifying(false);
       setStep(2);
-    }, 1500);
   };
 
   // Handle file upload
@@ -63,27 +106,33 @@ export default function Signup() {
   };
 
   // Handle form submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErrors({});
     const newErrors = {};
-    
+    formData.tempToken=tempToken;
+    // if(!tempToken) newErrors.tempToken = "Email not verified";
     if (!formData.firstName) newErrors.firstName = 'First name is required';
     if (!formData.lastName) newErrors.lastName = 'Last name is required';
+    if (!formData.password) newErrors.password = 'Position is required';
     if (!formData.position) newErrors.position = 'Position is required';
     if (!formData.companyName) newErrors.companyName = 'Company name is required';
     if (!formData.companyManual) newErrors.file = 'Company manual is required';
     
     if (Object.keys(newErrors).length > 0) {
+      console.log("ERRORS",newErrors);
       setErrors(newErrors);
       return;
     }
     
     // Simulate registration
     setIsSubmitting(true);
+    const response = await signUp(email,formData);
+    console.log(response);
     setTimeout(() => {
       setIsSubmitting(false);
       console.log('Registration completed:', { email, ...formData });
     }, 2000);
+    navigate('/login');
   };
 
   return (
@@ -129,7 +178,7 @@ export default function Signup() {
         {step === 1 && (
           <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2 ">Verify Your Email</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Email</h2>
               <p className="text-gray-600">Enter your work email to get started with Aurora</p>
             </div>
 
@@ -147,12 +196,19 @@ export default function Signup() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleEmailVerification()}
+                    disabled={isOtpSent}
                     className={`w-full pl-12 pr-4 py-3 border ${
                       errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } rounded-lg focus:outline-none focus:ring-2 transition text-lg`}
+                    } rounded-lg focus:outline-none focus:ring-2 transition text-lg ${
+                      isOtpSent ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
                     placeholder="your.email@company.com"
                   />
+                  {isOtpSent && (
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    </div>
+                  )}
                 </div>
                 {errors.email && (
                   <div className="flex items-center mt-2 text-red-600 text-sm">
@@ -162,23 +218,89 @@ export default function Signup() {
                 )}
               </div>
 
-              <button
-                onClick={handleEmailVerification}
-                disabled={isVerifying}
-                className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition shadow-xl shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {isVerifying ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Verifying Email...
-                  </>
-                ) : (
-                  <>
-                    Continue
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                )}
-              </button>
+              {!isOtpSent ? (
+                <button
+                  onClick={handleGetOtp}
+                  disabled={isSendingOtp}
+                  className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition shadow-xl shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isSendingOtp ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      Get OTP
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <>
+                  <div>
+                    <label htmlFor="otp" className="block text-md font-semibold text-gray-700 mb-2 text-left mx-2">
+                      Enter OTP
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Shield className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        id="otp"
+                        type="text"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onKeyPress={(e) => e.key === 'Enter' && handleVerifyOtp()}
+                        className={`w-full pl-12 pr-4 py-3 border ${
+                          errors.otp ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                        } rounded-lg focus:outline-none focus:ring-2 transition text-lg tracking-widest text-center font-bold`}
+                        placeholder="000000"
+                        maxLength={6}
+                      />
+                    </div>
+                    {errors.otp && (
+                      <div className="flex items-center mt-2 text-red-600 text-sm">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        <span>{errors.otp}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-gray-500">
+                        OTP sent to {email}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setIsOtpSent(false);
+                          setOtp('');
+                          setErrors({});
+                        }}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+                      >
+                        Change Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={isVerifying}
+                    className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition shadow-xl shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Verifying OTP...
+                      </>
+                    ) : (
+                      <>
+                        Verify OTP
+                        <CheckCircle className="w-5 h-5 ml-2" />
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -196,7 +318,7 @@ export default function Signup() {
         )}
 
         {/* Step 2: Full Registration Form */}
-        {step === 2 && (
+        {step === 2  && (
           <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Complete Your Profile</h2>
@@ -281,7 +403,44 @@ export default function Signup() {
                   )}
                 </div>
               </div>
-
+            {/* Password Input */}
+              <div>
+              <label htmlFor="password" className="block text-md text-left font-semibold text-gray-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  type={!showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className={`w-full pl-12 pr-12 py-3 border ${
+                    errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                  } rounded-lg focus:outline-none focus:ring-2 transition`}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5" />
+                  ) : (
+                    <Eye className="h-5" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <div className="flex items-center mt-2 text-red-600 text-sm">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.password}</span>
+                </div>
+              )}
+            </div>  
               {/* Position */}
               <div>
                 <label htmlFor="position" className="block text-md font-semibold text-gray-700 mb-2 text-left">
@@ -341,7 +500,7 @@ export default function Signup() {
               {/* Company Manual Upload */}
               <div>
                 <label className="block text-md text-left font-semibold text-gray-700 mb-2">
-                  Company Safety Manual (PDF)
+                  SOP/Safety Manual of your company (PDF)
                 </label>
                 
                 {!formData.companyManual ? (
@@ -398,12 +557,20 @@ export default function Signup() {
                   Upload your company's safety procedures manual. Aurora will use this to provide accurate guidance.
                 </p>
               </div>
-
+              {errors.tempToken && (
+                <div className="flex items-center mt-2 text-red-600 text-sm">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.tempToken}</span>
+                </div>
+              )}
+              
+              
               {/* Submit Button */}
               <button
-                onClick={handleSubmit}
+              type='button'
+                onClick={()=>handleSubmit()}
                 disabled={isSubmitting}
-                className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition shadow-xl shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition shadow-xl shadow-blue-600/30 disabled:opacity-50 cursor-pointer flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
@@ -425,9 +592,9 @@ export default function Signup() {
         <div className="text-center mt-6">
           <p className="text-gray-600">
             Already have an account?{' '}
-            <button className="font-semibold text-blue-600 hover:text-blue-700 transition">
-              Sign In
-            </button>
+            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 transition">
+              Log In
+            </Link>
           </p>
         </div>
       </div>
